@@ -115,3 +115,41 @@ suite('calendar: cache', t => {
     eq(cal.events('2026-10-01', '2026-10-31').events.length, 1, 'stale events kept during refetch');
   });
 });
+
+suite('calendar: creating and editing events', t => {
+  const calls = [];
+  const provider = {
+    async listCalendars() { return [{ id: 'primary', summary: 'Me', accessRole: 'owner', primary: true }, { id: 'hol', summary: 'Holidays', accessRole: 'reader' }, { id: 'fam', summary: 'Family', accessRole: 'writer' }]; },
+    async listEvents() { return []; },
+    async insert(cal, body) { calls.push(['insert', cal, body]); return { id: 'new1', ...body }; },
+    async patch(cal, id, body) { calls.push(['patch', cal, id, body]); return { id, ...body }; },
+    async remove(cal, id) { calls.push(['remove', cal, id]); },
+  };
+  t('eventBody: all-day ranges use an exclusive end date', () => {
+    eq(cal.eventBody({ title: 'Ski', allDay: true, start: '2027-02-12', end: '2027-02-14' }), { summary: 'Ski', start: { date: '2027-02-12' }, end: { date: '2027-02-15' } });
+  });
+  t('eventBody: timed events carry local wall time and the time zone', () => {
+    const b = cal.eventBody({ title: 'Party', allDay: false, start: '2026-10-10', end: '2026-10-11', startTime: '22:00', endTime: '01:00' });
+    eq([b.start.dateTime, b.end.dateTime], ['2026-10-10T22:00:00', '2026-10-11T01:00:00']);
+    ok(b.start.timeZone && b.end.timeZone);
+  });
+  t('writable calendars are owner/writer ones, primary first', async () => {
+    cal.setProvider(provider);
+    await cal.listCalendars();
+    eq(cal.writableCalendars().map(c => c.id), ['primary', 'fam']);
+  });
+  t('create / update / delete go to the right calendar', async () => {
+    calls.length = 0;
+    const e = { title: 'Lunch', allDay: false, start: '2026-10-09', end: '2026-10-09', startTime: '13:00', endTime: '14:30' };
+    await cal.createEvent('fam', e);
+    await cal.updateEvent('fam', 'abc', { ...e, title: 'Lunch!' });
+    await cal.deleteEvent('fam', 'abc');
+    eq(calls.map(c => [c[0], c[1]]), [['insert', 'fam'], ['patch', 'fam'], ['remove', 'fam']]);
+    eq(calls[1][3].summary, 'Lunch!');
+  });
+  t('normalise keeps what the editor needs', () => {
+    const n = cal.normalise({ id: 'i_2026', recurringEventId: 'i', summary: 'Standup', location: 'Room 1', start: { dateTime: new Date(2026, 9, 9, 9, 30).toISOString() }, end: { dateTime: new Date(2026, 9, 9, 9, 45).toISOString() } }, 'fam');
+    eq([n.calendarId, n.recurring, n.location, n.startTime, n.endTime, n.editable], ['fam', true, 'Room 1', '09:30', '09:45', true]);
+    eq(cal.normalise({ id: 'h', summary: 'Holiday', start: { date: '2026-12-25' }, end: { date: '2026-12-26' } }, 'hol').editable, false);
+  });
+});

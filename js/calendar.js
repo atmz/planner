@@ -4,12 +4,14 @@
 //   provider.listEvents(calendarId, start, end)    → raw Google-shaped events
 //   provider.insert(calendarId, body)              → event
 //   provider.patch(calendarId, eventId, body)      → event
+//   provider.remove(calendarId, eventId)
 import * as P from './periods.js';
 import { store } from './store.js';
 
 let provider = null;
 const cache = new Map(); // "start|end" → {at, events, background, promise}
-let calendarMeta = new Map(); // id → {summary, color}
+let calendarMeta = new Map(); // id → {summary, color, accessRole, primary}; 'primary' is an alias
+let calendarList = [];
 const TTL = 5 * 60_000;
 
 export function setProvider(p) { provider = p; cache.clear(); }
@@ -24,9 +26,25 @@ const hhmm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 export async function listCalendars() {
   if (!provider) return [];
   const cals = await provider.listCalendars();
-  calendarMeta = new Map(cals.map(c => [c.id, { summary: c.summary, color: c.backgroundColor }]));
+  calendarList = cals;
+  calendarMeta = new Map(cals.map(c => [c.id, { summary: c.summary, color: c.backgroundColor, accessRole: c.accessRole, primary: !!c.primary }]));
+  const primary = cals.find(c => c.primary);
+  if (primary) calendarMeta.set('primary', calendarMeta.get(primary.id));
   return cals;
 }
+
+/** Calendars new events can go into (owner/writer), primary first. */
+export function writableCalendars() {
+  return calendarList
+    .filter(c => ['owner', 'writer'].includes(c.accessRole))
+    .map(c => ({ id: c.primary ? 'primary' : c.id, summary: c.summary, color: c.backgroundColor, primary: !!c.primary }))
+    .sort((a, b) => b.primary - a.primary || a.summary.localeCompare(b.summary));
+}
+export const calendarName = id => calendarMeta.get(id)?.summary || (id === 'primary' ? 'Main calendar' : id);
+const canEdit = (calendarId, ev) => {
+  const role = calendarMeta.get(calendarId)?.accessRole ?? (calendarId === 'primary' ? 'owner' : 'reader');
+  return ['owner', 'writer'].includes(role) && !['birthday', 'fromGmail'].includes(ev.eventType);
+};
 
 function selected(key) {
   return store.setting(key).split(',').map(s => s.trim()).filter(Boolean);
@@ -34,12 +52,15 @@ function selected(key) {
 
 /** Normalise a Google event to {id, calendarId, title, allDay, start, end (inclusive), startTime, endTime, color, link}. */
 export function normalise(ev, calendarId) {
-  const color = calendarMeta.get(calendarId)?.color;
-  if (ev.start?.date) {
-    return { id: ev.id, calendarId, title: ev.summary || '(busy)', allDay: true, start: ev.start.date, end: P.addDays(ev.end?.date || P.addDays(ev.start.date, 1), -1), color, link: ev.htmlLink };
-  }
+  const base = {
+    id: ev.id, calendarId, title: ev.summary || '(busy)', color: calendarMeta.get(calendarId)?.color, link: ev.htmlLink,
+    location: ev.location || '', description: ev.description || '', recurring: !!ev.recurringEventId, editable: canEdit(calendarId, ev),
+  };
+  if (ev.start?.date) return { ...base, allDay: true, start: ev.start.date, end: P.addDays(ev.end?.date || P.addDays(ev.start.date, 1), -1) };
   const s = new Date(ev.start?.dateTime), e = new Date(ev.end?.dateTime || ev.start?.dateTime);
-  return { id: ev.id, calendarId, title: ev.summary || '(busy)', allDay: false, start: P.dayOf(s), end: P.dayOf(e), startTime: hhmm(s), endTime: hhmm(e), color, link: ev.htmlLink };
+  // An event ending exactly at midnight belongs to the day it started.
+  const endDay = P.dayOf(new Date(Math.max(s.getTime(), e.getTime() - 1)));
+  return { ...base, allDay: false, start: P.dayOf(s), end: endDay, startTime: hhmm(s), endTime: hhmm(e) };
 }
 
 /**
@@ -96,6 +117,19 @@ function allDayBody(title, startDay, endDay, description = '') {
 }
 const done = r => { invalidate(); store.emit('calendar'); return r; };
 
+/** Google event body from {title, allDay, start, end (inclusive), startTime, endTime, location?, description?}. */
+export function eventBody(e) {
+  const body = { summary: e.title };
+  if (e.location !== undefined && e.location !== '') body.location = e.location;
+  if (e.description !== undefined && e.description !== '') body.description = e.description;
+  if (e.allDay) return { ...body, start: { date: e.start }, end: { date: P.addDays(e.end || e.start, 1) } };
+  return { ...body, start: { dateTime: `${e.start}T${e.startTime}:00`, timeZone: tz() }, end: { dateTime: `${e.end || e.start}T${e.endTime}:00`, timeZone: tz() } };
+}
+
+export const createEvent = (calendarId, e) => provider.insert(calendarId || 'primary', eventBody(e)).then(done);
+export const updateEvent = (calendarId, id, e) => provider.patch(calendarId, id, eventBody(e)).then(done);
+export const deleteEvent = (calendarId, id) => provider.remove(calendarId, id).then(done);
+
 export const insertTaskEvent = t => provider.insert('primary', timedBody(t.title, t.when, t.time, 30, t.notes)).then(done);
 export const updateTaskEvent = t => provider.patch('primary', t.event_id, timedBody(t.title, t.when, t.time, 30, t.notes)).then(done);
 export const insertDeadlineEvent = t => provider.insert('primary', allDayBody(`Due: ${t.title}`, t.due, t.due)).then(done);
@@ -135,6 +169,9 @@ export function googleProvider(api) {
     },
     patch(calendarId, id, body) {
       return api(`${base}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`, { method: 'PATCH', body });
+    },
+    remove(calendarId, id) {
+      return api(`${base}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`, { method: 'DELETE' });
     },
   };
 }

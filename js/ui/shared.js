@@ -4,6 +4,7 @@ import { store, dueSoon, dueState, remindDefault, tripsOn, tripColor, goalProgre
 import * as cal from '../calendar.js';
 import { h, section, progressBar, areaDot, empty } from './components.js';
 import { taskRow } from './task.js';
+import { openEventEditor, openCapture } from './event.js';
 
 export function dueSoonStrip(day = today()) {
   const items = dueSoon(day);
@@ -35,9 +36,20 @@ export function eventList(events, day, { compact = false } = {}) {
   const allDay = todays.filter(e => e.allDay || e.start !== e.end);
   const timed = todays.filter(e => !e.allDay && e.start === e.end);
   return h('div.events', { class: compact ? 'compact' : '' },
-    allDay.map(e => h('div.event.all-day', { style: { '--ev': e.color || 'var(--accent)' }, title: e.title }, e.title)),
-    timed.map(e => h('div.event', { style: { '--ev': e.color || 'var(--accent)' }, title: `${e.startTime}–${e.endTime} ${e.title}` },
-      h('span.ev-time', e.startTime), ' ', e.title)));
+    allDay.map(e => eventChip(e, { cls: 'all-day' })),
+    timed.map(e => eventChip(e, { label: [h('span.ev-time', e.startTime), ' ', e.title], title: `${e.startTime}–${e.endTime} ${e.title}` })));
+}
+
+/** A calendar event as a button that opens its editor. */
+export function eventChip(e, { cls = '', label = e.title, title = e.title } = {}) {
+  return h('button.event', { type: 'button', class: cls, style: { '--ev': e.color || 'var(--accent)' }, title,
+    onclick: ev => { ev.stopPropagation(); openEventEditor(e); } }, label);
+}
+
+/** "+ event" button that opens quick capture in event mode for a day (and optional time). */
+export function addEventButton(day, time, label = '+ event') {
+  return h('button.add-event', { type: 'button', title: `Add a calendar event on ${P.fmtDayShort(day)}${time ? ' at ' + time : ''}`,
+    onclick: ev => { ev.preventDefault(); ev.stopPropagation(); openCapture({ mode: 'event', day, time }); } }, label);
 }
 
 /** Tasks due on `day` that aren't scheduled on that day (they'd otherwise be invisible there). */

@@ -1,11 +1,42 @@
 // Day page: focus, events timeline, todos, due items, trip items, "also this week", carried over.
 import * as P from '../periods.js';
 import { store, tasksAt, carriedOver, today } from '../store.js';
-import { h, section, focusBlock, notesBlock, empty } from './components.js';
+import { h, section, focusBlock, notesBlock } from './components.js';
 import { taskList, addLine, moveTask } from './task.js';
-import { dueSoonStrip, tripBanners, calRange, eventList, holidayLabels, dueMarkers } from './shared.js';
+import { dueSoonStrip, tripBanners, calRange, holidayLabels, dueMarkers, eventChip, addEventButton } from './shared.js';
+import * as cal from '../calendar.js';
+import { openCapture } from './event.js';
 
 const KIND_ICON = { flight: '✈', stay: '🛏', transport: '🚗', activity: '★', food: '🍴', note: '✎' };
+
+const pad = n => String(n).padStart(2, '0');
+
+/** All-day events, then one row per hour; empty rows are clickable to add an event at that time. */
+function timeline(events, day) {
+  const todays = cal.onDay(events, day);
+  const allDay = todays.filter(e => e.allDay || e.start !== e.end);
+  const timed = todays.filter(e => !e.allDay && e.start === e.end).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const hours = timed.map(e => Number(e.startTime.slice(0, 2)));
+  const first = Math.min(7, ...hours), last = Math.max(21, ...hours);
+  const nowH = day === today() ? new Date().getHours() : -1;
+  const canAdd = cal.available();
+  const rows = [];
+  for (let hr = first; hr <= last; hr++) {
+    const time = `${pad(hr)}:00`;
+    const here = timed.filter(e => Number(e.startTime.slice(0, 2)) === hr);
+    rows.push(h('div.slot', {
+      class: [here.length ? 'busy' : '', hr === nowH ? 'now' : '', canAdd ? 'addable' : ''].join(' '),
+      dataset: { time },
+      title: canAdd ? `Add an event at ${time}` : undefined,
+      onclick: canAdd ? e => { if (!e.target.closest('button.event')) openCapture({ mode: 'event', day, time }); } : undefined,
+    },
+      h('span.slot-time', time),
+      h('span.slot-events', here.map(e => eventChip(e, { label: [h('span.ev-time', `${e.startTime}–${e.endTime}`), ' ', e.title], title: `${e.startTime}–${e.endTime} ${e.title}${e.location ? ' · ' + e.location : ''}` })))));
+  }
+  return h('div.timeline',
+    allDay.length ? h('div.events.all-day-row', allDay.map(e => eventChip(e, { cls: 'all-day' }))) : null,
+    rows);
+}
 
 export function render(day) {
   const td = today();
@@ -33,7 +64,7 @@ export function render(day) {
           actions: t => h('button.chip', { type: 'button', onclick: () => moveTask(t.id, td) }, 'Do today'),
         })) : null),
       h('div.page-paper.right',
-        section('Schedule' + (loading ? ' …' : ''), eventList(events, day) || empty(loading ? 'Loading calendar…' : 'No events.')),
+        section(h('span', 'Schedule' + (loading ? ' …' : ''), cal.available() ? addEventButton(day) : null), timeline(events, day)),
         tripItems.length ? section('Trip plans', h('ul.trip-items', tripItems.map(i => h('li',
           h('span.kind', KIND_ICON[i.kind] || '•'), ' ',
           i.date < day ? h('span', 'Staying: ') : (i.time ? h('span.ev-time', i.time + ' ') : null),

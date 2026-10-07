@@ -91,3 +91,56 @@ suite('capture: predictability', t => {
   });
   t('empty input', () => eq(parseCapture('   ', ctx).title, ''));
 });
+
+// ---- events ---------------------------------------------------------------
+import { parseEvent, describeEvent } from '../js/capture.js';
+const ev = (text, opts = {}) => {
+  const r = parseEvent(text, { ...ctx, ...opts });
+  return { title: r.title, allDay: r.allDay, start: r.start, end: r.end, startTime: r.startTime, endTime: r.endTime };
+};
+
+suite('capture: events', t => {
+  t('day + time gets the default 30 minutes', () =>
+    eq(ev('Dentist 12 nov 9:15'), { title: 'Dentist', allDay: false, start: '2026-11-12', end: '2026-11-12', startTime: '09:15', endTime: '09:45' }));
+  t('duration with for 90m / 1h / 1.5h / 2 hours / 45 min', () => {
+    eq(ev('Lunch with Sam fri 1pm for 90m').endTime, '14:30');
+    eq(ev('Lunch fri 1pm for 1h').endTime, '14:00');
+    eq(ev('Lunch fri 1pm for 1.5h').endTime, '14:30');
+    eq(ev('Lunch fri 1pm for 2 hours').endTime, '15:00');
+    eq(ev('Call fri 1pm for 45 min').endTime, '13:45');
+    eq(ev('Lunch with Sam fri 1pm for 90m').title, 'Lunch with Sam');
+  });
+  t('time ranges', () => {
+    eq(ev('Meeting fri 1-2pm'), { title: 'Meeting', allDay: false, start: '2026-10-09', end: '2026-10-09', startTime: '13:00', endTime: '14:00' });
+    eq(ev('Meeting fri 10am-12:30pm').endTime, '12:30');
+    eq(ev('Meeting fri 13:00-14:30').endTime, '14:30');
+    eq(ev('Meeting fri 11am to 1pm').endTime, '13:00');
+    eq(ev('Meeting fri 11-1pm').startTime, '11:00');
+  });
+  t('no time means all day; no date means today', () => {
+    eq(ev('Holiday 12 nov'), { title: 'Holiday', allDay: true, start: '2026-11-12', end: '2026-11-12', startTime: '', endTime: '' });
+    eq(ev('Focus block 3pm').start, '2026-10-07');
+    eq(ev('Something'), { title: 'Something', allDay: true, start: '2026-10-07', end: '2026-10-07', startTime: '', endTime: '' });
+  });
+  t('date ranges become multi-day all-day events', () => {
+    eq(ev('Ski weekend 12-14 feb'), { title: 'Ski weekend', allDay: true, start: '2027-02-12', end: '2027-02-14', startTime: '', endTime: '' });
+    eq(ev('Ski weekend 12–14 feb').end, '2027-02-14');
+    eq(ev('Conference 30 oct - 2 nov'), { title: 'Conference', allDay: true, start: '2026-10-30', end: '2026-11-02', startTime: '', endTime: '' });
+    eq(ev('Trip fri to sun').end, '2026-10-11');
+  });
+  t('an event running past midnight ends the next day', () => {
+    const r = ev('Party sat 10pm for 3h');
+    eq([r.start, r.end, r.startTime, r.endTime], ['2026-10-10', '2026-10-11', '22:00', '01:00']);
+  });
+  t('event: prefix is stripped', () => eq(ev('event: Dentist tomorrow 9am').title, 'Dentist'));
+  t('defaults from where the box was opened (a day, a time)', () => {
+    eq(ev('Coffee', { defaultDay: '2026-10-15', defaultTime: '10:00' }), { title: 'Coffee', allDay: false, start: '2026-10-15', end: '2026-10-15', startTime: '10:00', endTime: '10:30' });
+    eq(ev('Coffee 2pm', { defaultDay: '2026-10-15' }).start, '2026-10-15', 'typed time keeps the opened day');
+    eq(ev('Coffee mon', { defaultDay: '2026-10-15', defaultTime: '10:00' }).start, '2026-10-12', 'typed date wins');
+  });
+  t('describeEvent', () => {
+    eq(describeEvent(parseEvent('Lunch fri 1pm for 90m', ctx), ctx), 'Fri 9 Oct · 13:00–14:30');
+    eq(describeEvent(parseEvent('Ski 12-14 feb', ctx), ctx), '12–14 Feb 2027 · all day');
+    eq(describeEvent(parseEvent('Dentist 12 nov', ctx), ctx), 'Thu 12 Nov · all day');
+  });
+});

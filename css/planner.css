@@ -532,11 +532,45 @@ dialog.sheet { margin-bottom: 0; border-radius: 12px 12px 0 0; }
 .toast button { background: none; border: 1px solid color-mix(in srgb, var(--paper) 40%, transparent); color: var(--paper); font-size: .8rem; padding: .2rem .55rem; }
 .toast button.icon { border: 0; color: var(--paper); }
 
+/* ---------- calendar events: clickable, addable ---------- */
+button.event { display: block; width: 100%; text-align: left; background: none; border: 0; border-left: 3px solid var(--ev); border-radius: 0; padding: 0 0 0 .45rem; font: inherit; font-size: .8rem; line-height: 1.4; color: var(--ink-soft); cursor: pointer; }
+button.event:hover { color: var(--ink); background: color-mix(in srgb, var(--ev) 10%, transparent); }
+button.event.all-day { background: color-mix(in srgb, var(--ev) 14%, transparent); border-radius: 3px; color: var(--ink); }
+button.event.mini-event { font-size: .68rem; border-left-width: 2px; padding-left: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.events.compact button.event { font-size: .74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-cell-top { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.add-event { border: 0; background: none; padding: .1rem .35rem; font-size: .72rem; color: var(--accent); border-radius: var(--r); opacity: 0; transition: opacity .15s; }
+.add-event:hover { background: var(--accent-soft); }
+.day-cell:hover .add-event, .add-event:focus-visible, .panel-title .add-event { opacity: 1; }
+.panel-title .add-event { margin-left: .5rem; text-transform: none; letter-spacing: 0; font-weight: 500; }
+@media (pointer: coarse) { .add-event { opacity: .8; } }
+.timeline { display: grid; }
+.timeline .all-day-row { margin-bottom: .4rem; }
+.slot { display: grid; grid-template-columns: 3.2rem 1fr; gap: .5rem; min-height: 1.9rem; border-top: 1px solid var(--rule); padding: .15rem 0; align-items: start; }
+.slot-time { font-size: .72rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; padding-top: .15rem; }
+.slot-events { display: grid; gap: 2px; min-width: 0; }
+.slot.addable { cursor: pointer; }
+.slot.addable:not(.busy):hover { background: var(--accent-soft); }
+.slot.addable:not(.busy):hover .slot-events::after { content: '+ add event'; font-size: .75rem; color: var(--accent); }
+.slot.now .slot-time { color: var(--accent); font-weight: 700; }
+.slot.now { border-top: 2px solid var(--accent); }
+.capture-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.mode-toggle { display: inline-flex; align-items: center; gap: .3rem; }
+.cal-row { display: flex; align-items: center; gap: .4rem; min-height: 0; }
+.cal-row select { font-size: .85rem; }
+.field.inline { display: flex; align-items: center; gap: .4rem; }
+.field.inline > span:first-child { text-transform: none; letter-spacing: 0; font: inherit; color: var(--ink); }
+.error-text { color: var(--overdue); font-size: .85rem; min-height: 0; }
+.error-text:empty { display: none; }
+.event-editor .editor-head h3 { flex: 1; }
+
 /* ---------- zen mode: fewer things on the page ---------- */
 .zen .week-page .rail, .zen .due-strip { display: none; }
 .zen .week-layout, .zen .month-layout { grid-template-columns: minmax(0, 1fr); }
 .zen .month-page .rail { display: none; }
-.zen .day-cell .event:not(.all-day), .zen .month-cell .mini-event, .zen .month-cell .more { display: none; }
+.zen .day-cell .event:not(.all-day), .zen .month-cell .mini-event:not(.all-day), .zen .month-cell .more { display: none; }
+.zen .add-event { opacity: 0; }
+.zen .day-cell:hover .add-event { opacity: 1; }
 .zen .task .chip:not(.time):not(.prio):not(.due.overdue):not(.due.soon) { display: none; }
 .zen .day-cell { min-height: 7rem; }
 .zen .day-cell input.add-line, .zen .drop-zone input.add-line { opacity: 0; transition: opacity .15s; }

@@ -139,6 +139,33 @@ await shot('interact-zen-week');
 await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', bubbles: true }))`); await sleep(300);
 if (await evaluate(`document.documentElement.classList.contains('zen')`)) problems.push('[zen] pressing z again did not turn zen off');
 
+currentRoute = 'interact:events';
+await evaluate(`location.hash = '#/week'`); await sleep(500);
+if (!(await evaluate(`!!document.querySelector('.day-cell .add-event')`))) problems.push('[events] no "+ event" button on week days');
+await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', bubbles: true }))`); await sleep(300);
+await evaluate(`(() => { const i = document.querySelector('.capture-input'); i.value = 'event: Smoke meeting fri 1pm for 1h'; i.dispatchEvent(new Event('input')); })()`); await sleep(200);
+const evPreview = await evaluate(`document.querySelector('.capture-preview')?.innerText || ''`);
+if (!/13:00.14:00/.test(evPreview)) problems.push('[events] capture preview missing event time: ' + evPreview);
+await evaluate(`document.querySelector('.capture-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`); await sleep(1200);
+const evShown = () => evaluate(`[...document.querySelectorAll('.day-cell .event')].map(e => e.textContent).join('|')`);
+if (!/Smoke meeting/.test(await evShown())) problems.push('[events] created event not shown in week view');
+await evaluate(`[...document.querySelectorAll('.day-cell .event')].find(e => /Smoke meeting/.test(e.textContent))?.click()`); await sleep(400);
+const edTitle = await evaluate(`document.querySelector('dialog[open] .event-editor input.title-input')?.value`);
+if (edTitle !== 'Smoke meeting') problems.push('[events] clicking an event did not open its editor: ' + edTitle);
+await evaluate(`(() => { const t = document.querySelector('dialog[open] .event-editor input.title-input'); t.value = 'Smoke edited'; t.dispatchEvent(new Event('input')); document.querySelector('dialog[open] .event-editor button.primary').click(); })()`); await sleep(1200);
+if (!/Smoke edited/.test(await evShown())) problems.push('[events] edited title not shown');
+await evaluate(`[...document.querySelectorAll('.day-cell .event')].find(e => /Smoke edited/.test(e.textContent))?.click()`); await sleep(400);
+await evaluate(`document.querySelector('dialog[open] .event-editor button.danger')?.click()`); await sleep(300);
+await evaluate(`[...document.querySelectorAll('dialog[open] .confirm button.danger')].pop()?.click()`); await sleep(1200);
+if (/Smoke edited/.test(await evShown())) problems.push('[events] deleted event still shown');
+await evaluate(`location.hash = '#/day'`); await sleep(600);
+await evaluate(`document.querySelector('.timeline .slot[data-time="15:00"]')?.click()`); await sleep(300);
+const slotPreview = await evaluate(`document.querySelector('dialog[open] .capture-preview')?.innerText || ''`);
+if (!/15:00/.test(slotPreview)) problems.push('[events] clicking a free 15:00 slot did not prefill the time: ' + slotPreview);
+await evaluate(`(() => { const i = document.querySelector('dialog[open] .capture-input'); i.value = 'Coffee with Jo for 45m'; i.dispatchEvent(new Event('input')); })()`); await sleep(200);
+await shot('interact-event-capture');
+await evaluate(`document.querySelector('dialog[open]')?.close()`); await sleep(200);
+
 currentRoute = 'interact:review';
 await evaluate(`location.hash = '#/review/2026-W41'`); await sleep(400);
 for (let i = 0; i < 4; i++) { await evaluate(`[...document.querySelectorAll('.review-page .actions button.primary')].pop()?.click()`); await sleep(300); }

@@ -11,7 +11,7 @@ const delay = (ms = 60) => new Promise(r => setTimeout(r, ms));
 const clone = x => JSON.parse(JSON.stringify(x));
 
 export const MOCK_QUEUE_KEY = 'planner-queue:mock';
-export function resetMock() { lsSet(KEY, null); lsSet(EV_KEY, null); lsSet(MOCK_QUEUE_KEY, null); }
+export function resetMock() { lsSet(KEY, null); lsSet(EV_KEY, null); lsSet(EV_KEY + '-overrides', null); lsSet(MOCK_QUEUE_KEY, null); }
 
 // ---------------------------------------------------------------------------
 // Data
@@ -149,10 +149,10 @@ export function mockBackend() {
 // Calendar provider
 
 const CALS = [
-  { id: 'primary', summary: 'Me', backgroundColor: '#4a78b5', primary: true },
-  { id: 'family', summary: 'Family', backgroundColor: '#4c8a5a' },
-  { id: 'holidays', summary: 'Public holidays', backgroundColor: '#9e9e9e' },
-  { id: 'school', summary: 'School terms', backgroundColor: '#b39ddb' },
+  { id: 'primary', summary: 'Me', backgroundColor: '#4a78b5', primary: true, accessRole: 'owner' },
+  { id: 'family', summary: 'Family', backgroundColor: '#4c8a5a', accessRole: 'writer' },
+  { id: 'holidays', summary: 'Public holidays', backgroundColor: '#9e9e9e', accessRole: 'reader' },
+  { id: 'school', summary: 'School terms', backgroundColor: '#b39ddb', accessRole: 'reader' },
 ];
 
 const HOLIDAYS = {
@@ -208,6 +208,10 @@ function generatedEvents(cal, start, end) {
 export function mockCalendarProvider() {
   const created = () => { try { return JSON.parse(lsGet(EV_KEY) || '[]'); } catch { return []; } };
   const saveCreated = list => lsSet(EV_KEY, JSON.stringify(list));
+  // Edits/deletions of generated sample events: id → patched event, or null when deleted.
+  const OV_KEY = EV_KEY + '-overrides';
+  const overrides = () => { try { return JSON.parse(lsGet(OV_KEY) || '{}'); } catch { return {}; } };
+  const saveOverrides = o => lsSet(OV_KEY, JSON.stringify(o));
   return {
     async listCalendars() { await delay(30); return CALS; },
     async listEvents(cal, start, end) {
@@ -217,7 +221,9 @@ export function mockCalendarProvider() {
         const e = ev.end.date ? P.addDays(ev.end.date, -1) : ev.end.dateTime.slice(0, 10);
         return s <= end && e >= start;
       });
-      return [...generatedEvents(cal, start, end), ...mine];
+      const ov = overrides();
+      const generated = generatedEvents(cal, start, end).filter(e => ov[e.id] !== null).map(e => (ov[e.id] ? { ...e, ...ov[e.id] } : e));
+      return [...generated, ...mine];
     },
     async insert(cal, body) {
       await delay();
@@ -229,10 +235,17 @@ export function mockCalendarProvider() {
       await delay();
       const list = created();
       const i = list.findIndex(x => x.ev.id === id);
-      if (i < 0) throw new Error('Event not found');
-      list[i].ev = { ...list[i].ev, ...body, start: toIso(body.start), end: toIso(body.end) };
+      const patch = { ...body, start: toIso(body.start), end: toIso(body.end) };
+      if (i < 0) { const o = overrides(); o[id] = { ...(o[id] || {}), ...patch }; saveOverrides(o); return { id, ...o[id] }; }
+      list[i].ev = { ...list[i].ev, ...patch };
       saveCreated(list);
       return list[i].ev;
+    },
+    async remove(cal, id) {
+      await delay();
+      const list = created();
+      if (list.some(x => x.ev.id === id)) saveCreated(list.filter(x => x.ev.id !== id));
+      else { const o = overrides(); o[id] = null; saveOverrides(o); }
     },
   };
 }

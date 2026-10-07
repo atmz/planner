@@ -8,9 +8,9 @@ import * as cal from './calendar.js';
 import { sheetBackend, createSpreadsheet } from './sheet.js';
 import { mockBackend, mockCalendarProvider } from './mock.js';
 import { parseHash, periodHash, HORIZONS, onRoute } from './router.js';
-import { parseCapture, describeCapture } from './capture.js';
-import { h, modal, toast } from './ui/components.js';
+import { h, toast } from './ui/components.js';
 import { enableDragAndDrop } from './ui/task.js';
+import { openCapture } from './ui/event.js';
 import * as day from './ui/day.js';
 import * as week from './ui/week.js';
 import * as month from './ui/month.js';
@@ -88,7 +88,7 @@ async function start(backend) {
     console.error(e);
     return screen(messageScreen('Couldn’t load the planner', e.message, h('button', { onclick: () => start(backend) }, 'Retry')));
   }
-  root.replaceChildren(h('header#header'), h('main#main'), h('button#fab', { type: 'button', 'aria-label': 'Quick capture (n)', title: 'Quick capture (n)', onclick: openCapture }, '+'));
+  root.replaceChildren(h('header#header'), h('main#main'), h('button#fab', { type: 'button', 'aria-label': 'Quick capture (n)', title: 'Quick capture (n)', onclick: () => openCapture() }, '+'));
   enableDragAndDrop(root);
   store.subscribe(kind => {
     if (kind === 'status') return renderStatus();
@@ -278,6 +278,7 @@ function onKey(e) {
   const go = hash => { e.preventDefault(); location.hash = hash; };
   const horizon = { d: 'day', w: 'week', m: 'month', q: 'quarter', y: 'year' }[e.key];
   if (e.key === 'n') { e.preventDefault(); openCapture(); }
+  else if (e.key === 'e') { e.preventDefault(); openCapture({ mode: 'event' }); }
   else if (e.key === 'z') { e.preventDefault(); setZen(!document.documentElement.classList.contains('zen')); }
   else if (e.key === 'ArrowLeft' && period) go(periodHash(P.prev(period)));
   else if (e.key === 'ArrowRight' && period) go(periodHash(P.next(period)));
@@ -286,43 +287,6 @@ function onKey(e) {
   else if (e.key === 'g') go('#/goals');
   else if (e.key === 'p') go('#/projects');
   else if (e.key === 'i') go('#/inbox');
-}
-
-// ---------------------------------------------------------------------------
-// Quick capture
-
-function captureContext() {
-  return {
-    today: P.today(),
-    areas: store.all('Areas'),
-    projects: store.all('Projects').filter(p => !['done', 'dropped'].includes(p.status)),
-    trips: store.all('Trips').filter(t => t.status !== 'cancelled' && t.status !== 'done'),
-  };
-}
-
-export function openCapture() {
-  modal(close => {
-    const input = h('input.capture-input', { type: 'text', placeholder: 'e.g. Call tiler fri 10am #home  ·  Renew insurance due 31 oct', 'aria-label': 'Quick capture' });
-    const preview = h('div.capture-preview');
-    const update = () => {
-      const r = parseCapture(input.value, captureContext());
-      preview.replaceChildren(...(input.value.trim() ? describeCapture(r, captureContext()).map(([k, v]) => h('span.chip', { class: k }, `${k}: ${v}`)) : [h('span.muted', 'Tags: #area or #project · @trip · due <date> · today, fri, 12 nov, 10am, next week, someday, !')]));
-    };
-    const save = () => {
-      const r = parseCapture(input.value, captureContext());
-      if (!r.title) return;
-      const { title, when, time, due, area_id, project_id, trip_id, priority } = r;
-      const rec = store.add('Tasks', { title, when, time, due, area_id, project_id, trip_id, priority });
-      close();
-      toast(`Added to ${P.relLabel(rec.when) || 'Inbox'}`, { action: 'Edit', onAction: () => import('./ui/task.js').then(m => m.openTaskEditor(rec.id)) });
-    };
-    input.addEventListener('input', update);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
-    update();
-    setTimeout(() => input.focus(), 0);
-    return h('div.capture', h('h3', 'Quick capture'), input, preview,
-      h('div.actions', h('button', { type: 'button', onclick: close }, 'Cancel'), h('button.primary', { type: 'button', onclick: save }, 'Add')));
-  }, { cls: 'capture-dialog' });
 }
 
 boot();

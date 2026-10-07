@@ -3,7 +3,8 @@ import * as P from '../periods.js';
 import { tasksAt, carriedOver, today } from '../store.js';
 import { h, section, focusBlock, notesBlock } from './components.js';
 import { taskList, addLine, moveTask } from './task.js';
-import { dueSoonStrip, calRange, eventList, holidayLabels, dueMarkers, tripBanners, goalsInPlay, reviewLink } from './shared.js';
+import { dueSoonStrip, calRange, eventList, holidayLabels, dueMarkers, tripBanners, goalsInPlay, reviewLink, addEventButton } from './shared.js';
+import * as cal from '../calendar.js';
 
 export function render(week) {
   const td = today();
@@ -14,9 +15,11 @@ export function render(week) {
   const isThisWeek = P.contains(week, td);
 
   const dayCell = (day, cls = '') => h('div.day-cell', { class: [cls, day === td ? 'today' : '', P.dow(day) >= 5 ? 'weekend' : ''].join(' '), dataset: { dropWhen: day } },
-    h('a.day-cell-head', { href: `#/day/${day}` },
-      h('span.dow', P.DOW3[P.dow(day)]), h('span.date', String(Number(day.slice(8)))),
-      day.slice(8) === '01' || day === days[0] ? h('span.muted.small', P.MON3[Number(day.slice(5, 7)) - 1]) : null),
+    h('div.day-cell-top',
+      h('a.day-cell-head', { href: `#/day/${day}` },
+        h('span.dow', P.DOW3[P.dow(day)]), h('span.date', String(Number(day.slice(8)))),
+        day.slice(8) === '01' || day === days[0] ? h('span.muted.small', P.MON3[Number(day.slice(5, 7)) - 1]) : null),
+      cal.available() ? addEventButton(day) : null),
     holidayLabels(background, day),
     tripBanners(day),
     eventList(events, day, { compact: true }),
