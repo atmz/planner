@@ -1,0 +1,117 @@
+import { suite, eq, ok } from './harness.js';
+import { TAB_NAMES } from '../js/schema.js';
+
+const mem = new Map();
+globalThis.localStorage ??= { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k), clear: () => mem.clear() };
+const { store } = await import('../js/store.js');
+const cal = await import('../js/calendar.js');
+
+const clone = x => JSON.parse(JSON.stringify(x));
+const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
+async function settle() { for (let i = 0; i < 50 && (store.pending() || store.status === 'saving'); i++) await tick(5); }
+
+function fakeBackend({ queueKey = 'planner-queue:test', remote = {}, onAppend, onUpdate } = {}) {
+  const db = Object.fromEntries(TAB_NAMES.map(t => [t, clone(remote[t] || [])]));
+  let gate = null;
+  return {
+    queueKey, db,
+    hold() { let release; gate = new Promise(r => { release = r; }); return () => release(); },
+    async loadAll() { const snap = clone(db); if (gate) { const g = gate; gate = null; await g; } return snap; },
+    async append(tab, rec, opts) { if (onAppend) await onAppend(tab, rec, opts); db[tab].push(clone(rec)); return rec; },
+    async update(tab, key, patch, baseAt, full) {
+      if (onUpdate) await onUpdate(tab, key, patch);
+      const k = tab === 'Periods' ? 'period' : tab === 'Settings' ? 'key' : 'id';
+      const i = db[tab].findIndex(r => r[k] === key);
+      if (i < 0) { db[tab].push({ ...full, ...patch }); return { ...full, ...patch }; }
+      db[tab][i] = { ...db[tab][i], ...patch };
+      return clone(db[tab][i]);
+    },
+  };
+}
+
+suite('store: write queue', t => {
+  t('a write that lands during a refresh is not undone by the stale snapshot', async () => {
+    localStorage.clear();
+    const be = fakeBackend();
+    await store.init(be);
+    const release = be.hold();
+    const refreshing = store.refresh();
+    const rec = store.add('Tasks', { title: 'Added mid-refresh' });
+    await settle();
+    eq(be.db.Tasks.length, 1, 'saved to backend');
+    release();
+    await refreshing;
+    ok(store.get('Tasks', rec.id), 'still visible after refresh');
+  });
+  t('a non-retryable failure is set aside and later writes still save', async () => {
+    localStorage.clear();
+    const be = fakeBackend({ onAppend: (tab, rec) => { if (rec.title === 'bad') throw Object.assign(new Error('Bad request'), { status: 400 }); } });
+    await store.init(be);
+    store.add('Tasks', { title: 'bad' });
+    store.add('Tasks', { title: 'good' });
+    await settle();
+    eq(be.db.Tasks.map(r => r.title), ['good']);
+    eq(store.failed().length, 1);
+    eq(store.pending(), 0);
+  });
+  t('a 403 permission error is not treated as signed out', async () => {
+    localStorage.clear();
+    const be = fakeBackend({ onAppend: () => { throw Object.assign(new Error('The caller does not have permission'), { status: 403 }); } });
+    await store.init(be);
+    store.add('Tasks', { title: 'x' });
+    await settle();
+    ok(store.status !== 'auth', 'status ' + store.status);
+    eq(store.failed().length, 1);
+  });
+  t('a retried append is flagged so the backend can check for a landed first attempt', async () => {
+    localStorage.clear();
+    const seen = [];
+    let fail = true;
+    const be = fakeBackend({ onAppend: (tab, rec, opts) => { seen.push(!!opts?.retry); if (fail) { fail = false; throw Object.assign(new Error('Network'), { offline: true }); } } });
+    await store.init(be);
+    store.add('Tasks', { title: 'flaky' });
+    await settle();
+    await store.flush();
+    await settle();
+    eq(seen, [false, true]);
+    eq(be.db.Tasks.length, 1);
+  });
+  t('the persisted queue is per backend (sample data never flushes into the real sheet)', async () => {
+    localStorage.clear();
+    const mock = fakeBackend({ queueKey: 'planner-queue:mock', onAppend: () => { throw Object.assign(new Error('Offline'), { offline: true }); } });
+    await store.init(mock);
+    store.add('Tasks', { title: 'mock edit' });
+    await settle();
+    eq(store.pending(), 1, 'queued in mock mode');
+    const sheet = fakeBackend({ queueKey: 'planner-queue:sheet:S' });
+    await store.init(sheet);
+    await settle();
+    eq(sheet.db.Tasks.length, 0, 'not flushed into the sheet');
+  });
+  t('duplicate Periods rows are merged field by field on load', async () => {
+    localStorage.clear();
+    const be = fakeBackend({ remote: { Periods: [
+      { period: '2026-W41', focus_1: 'Sam', notes: '', updated_at: '2026-10-07T09:00:00Z' },
+      { period: '2026-W41', focus_1: '', notes: 'Jo', updated_at: '2026-10-07T09:01:00Z' },
+    ] } });
+    await store.init(be);
+    const p = store.period('2026-W41');
+    eq([p.focus_1, p.notes], ['Sam', 'Jo']);
+  });
+});
+
+suite('calendar: cache', t => {
+  t('after invalidate, events stay visible while refetching', async () => {
+    localStorage.clear();
+    await store.init(fakeBackend());
+    cal.setProvider({
+      async listCalendars() { return [{ id: 'primary', summary: 'Me' }]; },
+      async listEvents() { return [{ id: 'e1', summary: 'Meet', start: { date: '2026-10-09' }, end: { date: '2026-10-10' } }]; },
+    });
+    cal.events('2026-10-01', '2026-10-31');
+    await tick(10);
+    eq(cal.events('2026-10-01', '2026-10-31').events.length, 1);
+    cal.invalidate();
+    eq(cal.events('2026-10-01', '2026-10-31').events.length, 1, 'stale events kept during refetch');
+  });
+});

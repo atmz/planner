@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>periods.js tests</title></head>
+<body style="font-family: system-ui; margin: 24px">
+<h1>periods.js tests</h1><div id="out">Running…</div>
+<script type="module">
+import { run, renderResults } from './harness.js';
+await import('./periods.tests.js');
+renderResults(await run(), document.getElementById('out'));
+</script>
+</body></html>

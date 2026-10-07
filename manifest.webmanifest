@@ -1,0 +1,9 @@
+{
+  "name": "Planner",
+  "short_name": "Planner",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fbf8f1",
+  "theme_color": "#2f5d50",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
