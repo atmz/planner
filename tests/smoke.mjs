@@ -60,7 +60,7 @@ async function viewport(width, height, mobile = false) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
 }
 
-const ROUTES = ['week', 'day', 'month', 'quarter', 'year', 'year/2026?rolling=1', 'todos', 'todos?group=area', 'todos?group=when', 'trips', 'goals', 'projects', 'lists', 'inbox', 'someday', 'settings', 'review/2026-W40'];
+const ROUTES = ['habits', 'week', 'day', 'month', 'quarter', 'year', 'year/2026?rolling=1', 'todos', 'todos?group=area', 'todos?group=when', 'trips', 'goals', 'projects', 'lists', 'inbox', 'someday', 'settings', 'review/2026-W40'];
 
 await viewport(1440, 1000);
 await send('Page.navigate', { url: `${base}/index.html?mock=1` });
@@ -165,6 +165,27 @@ if (!/15:00/.test(slotPreview)) problems.push('[events] clicking a free 15:00 sl
 await evaluate(`(() => { const i = document.querySelector('dialog[open] .capture-input'); i.value = 'Coffee with Jo for 45m'; i.dispatchEvent(new Event('input')); })()`); await sleep(200);
 await shot('interact-event-capture');
 await evaluate(`document.querySelector('dialog[open]')?.close()`); await sleep(200);
+
+currentRoute = 'interact:habits';
+await evaluate(`location.hash = '#/habits'`); await sleep(500);
+const cards = await evaluate(`document.querySelectorAll('.habit-card').length`);
+if (cards < 3) problems.push('[habits] expected sample habits on the Habits page, found ' + cards);
+await evaluate(`(() => { const i = document.querySelector('#new-habit-title'); i.value = 'Smoke habit'; i.closest('form').requestSubmit(); })()`); await sleep(500);
+if (!(await evaluate(`[...document.querySelectorAll('.habit-card h3')].some(e => e.textContent.includes('Smoke habit'))`))) problems.push('[habits] adding a habit did not show it');
+await evaluate(`location.hash = '#/week'`); await sleep(500);
+if (!(await evaluate(`!!document.querySelector('.habit-grid')`))) problems.push('[habits] no habit grid in the week view');
+const toggled = await evaluate(`(async () => {
+  const cell = [...document.querySelectorAll('.habit-grid button.habit-cell:not(.on)')].find(b => !b.disabled);
+  if (!cell) return 'no cell';
+  const key = cell.dataset.key; cell.click();
+  await new Promise(r => setTimeout(r, 400));
+  return document.querySelector('.habit-grid button.habit-cell[data-key="' + key + '"]').classList.contains('on');
+})()`);
+if (toggled !== true) problems.push('[habits] ticking a habit cell did not mark it: ' + toggled);
+await evaluate(`document.querySelector('.habit-grid').scrollIntoView({ block: 'center' })`); await sleep(200);
+await shot('interact-habit-grid');
+await evaluate(`location.hash = '#/day'`); await sleep(500);
+if (!(await evaluate(`document.querySelectorAll('.habits-panel input[type=checkbox]').length > 0`))) problems.push('[habits] no habit checkboxes in the day view');
 
 currentRoute = 'interact:review';
 await evaluate(`location.hash = '#/review/2026-W41'`); await sleep(400);

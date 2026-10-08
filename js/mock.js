@@ -3,8 +3,8 @@
 import * as P from './periods.js';
 import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
 
-const KEY = 'planner-mock-v2';
-const EV_KEY = 'planner-mock-events-v2';
+const KEY = 'planner-mock-v3';
+const EV_KEY = 'planner-mock-events-v3';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* ignore */ } };
 const delay = (ms = 60) => new Promise(r => setTimeout(r, ms));
@@ -101,6 +101,21 @@ function generate(T = P.today()) {
   task({ title: 'Dentist check-up', when: d(8), time: '09:15', area_id: personal.id });
   task({ title: 'Quarterly accounts', when: P.next(month), due: P.addDays(P.end(P.next(month)), -5), area_id: work.id, remind_days: 7 });
   task({ title: 'Review insurance renewals', when: P.next(quarter), area_id: home.id });
+
+  // Habits with ~10 weeks of history (deterministic, mostly kept)
+  const habit = f => add('Habits', { start: d(-70), ...f });
+  const hNo = habit({ title: 'No alcohol', kind: 'avoid', schedule: 'daily', area_id: personal.id, order: 0 });
+  const hBike = habit({ title: 'Ride bike', kind: 'do', schedule: 'weekly', target: 3, area_id: personal.id, order: 1 });
+  const hGym = habit({ title: 'Gym', kind: 'do', schedule: 'days', days: 'mon,wed,fri', area_id: personal.id, order: 2 });
+  const hRead = habit({ title: 'Read 20 minutes', kind: 'do', schedule: 'daily', area_id: personal.id, order: 3 });
+  for (let i = 70; i >= 1; i--) {
+    const day = d(-i), wd = P.dow(day);
+    const tick = hb => db.HabitLog.push({ key: `${hb.id}|${day}`, habit_id: hb.id, day, done: true, note: '', updated_at: new Date().toISOString() });
+    if (i % 9 !== 4 && i % 13 !== 6) tick(hNo);
+    if ([1, 3, 5].includes(wd) && i % 17 !== 2) tick(hBike);
+    if ([0, 2, 4].includes(wd) && i % 11 !== 3) tick(hGym);
+    if (i % 3 !== 0) tick(hRead);
+  }
 
   // Period pages
   db.Periods.push(

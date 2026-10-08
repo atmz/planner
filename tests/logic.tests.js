@@ -147,3 +147,15 @@ suite('ui helpers', t => {
     eq(safeHref(''), null);
   });
 });
+
+suite('schema: habits', t => {
+  t('Habits and HabitLog tabs exist with the right keys and types', () => {
+    ok(TABS.Habits && TABS.Habits.key === 'id');
+    eq(TABS.HabitLog.key, 'key');
+    for (const c of ['title', 'kind', 'schedule', 'days', 'target', 'area_id', 'start', 'archived']) ok(TABS.Habits.columns.includes(c), c);
+    for (const c of ['habit_id', 'day', 'done']) ok(TABS.HabitLog.columns.includes(c), c);
+    const h = fromRow('Habits', ['h1', '3', 'TRUE'], ['id', 'target', 'archived']);
+    eq([h.target, h.archived], [3, true]);
+    eq(fromRow('HabitLog', ['h1|2026-10-08', 46303], ['key', 'day']).day, '2026-10-08');
+  });
+});

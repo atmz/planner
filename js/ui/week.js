@@ -5,6 +5,7 @@ import { h, section, focusBlock, notesBlock } from './components.js';
 import { taskList, addLine, moveTask } from './task.js';
 import { dueSoonStrip, calRange, eventList, holidayLabels, dueMarkers, tripBanners, goalsInPlay, reviewLink, addEventButton } from './shared.js';
 import * as cal from '../calendar.js';
+import { habitWeekGrid } from './habits.js';
 
 export function render(week) {
   const td = today();
@@ -46,7 +47,7 @@ export function render(week) {
   return h('div.page.week-page',
     isThisWeek ? dueSoonStrip(td) : null,
     h('div.week-layout',
-      h('div.spread',
+      h('div.week-main', h('div.spread',
         h('div.page-paper.left',
           days.slice(0, 3).map(d => dayCell(d)),
           focusBlock(week, 'Week focus')),
@@ -55,6 +56,7 @@ export function render(week) {
           days.slice(3, 5).map(d => dayCell(d)),
           h('div.weekend-pair', dayCell(days[5], 'half'), dayCell(days[6], 'half')),
           notesBlock(week))),
+        habitWeekGrid(week)),
       rail));
 }
 

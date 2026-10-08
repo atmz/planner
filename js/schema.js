@@ -22,13 +22,15 @@ export const TABS = {
   },
   Lists: { key: 'id', columns: ['id', 'title', 'area_id', 'trip_id', 'notes', 'order', ...AUDIT] },
   Settings: { key: 'key', columns: ['key', 'value', 'updated_at'] },
+  Habits: { key: 'id', columns: ['id', 'title', 'kind', 'schedule', 'days', 'target', 'area_id', 'color', 'start', 'order', 'archived', 'notes', ...AUDIT] },
+  HabitLog: { key: 'key', columns: ['key', 'habit_id', 'day', 'done', 'note', 'updated_at'] },
 };
 
 export const TAB_NAMES = Object.keys(TABS);
 
 const BOOL = new Set(['done', 'deleted', 'archived']);
-const NUM = new Set(['order', 'progress', 'remind_days', 'cost']);
-const DATE = new Set(['due', 'start', 'end', 'date', 'end_date']);
+const NUM = new Set(['order', 'progress', 'remind_days', 'cost', 'target']);
+const DATE = new Set(['due', 'start', 'end', 'date', 'end_date', 'day']);
 const PERIOD = new Set(['when', 'target']);
 const TIME = new Set(['time', 'due_time', 'end_time']);
 

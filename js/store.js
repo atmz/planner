@@ -309,6 +309,25 @@ export function tripColor(trip) { return trip.color || areaOf(trip)?.color || '#
 export function packingList(tripId) { return store.all('Lists').find(l => l.trip_id === tripId) || null; }
 export function listItems(listId) { return tasks(t => t.list_id === listId).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.created_at || '').localeCompare(b.created_at || '')); }
 
+// ---- habits
+
+export function habits() {
+  return store.all('Habits').filter(h => !h.archived).sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.created_at || '').localeCompare(b.created_at || ''));
+}
+
+/** Set of "habitId|day" keys for ticked days. */
+export function habitLog() {
+  const s = new Set();
+  for (const r of store.data.HabitLog.values()) if (r.done && !r.deleted) s.add(r.key);
+  return s;
+}
+
+export function toggleHabit(habitId, day) {
+  const key = `${habitId}|${day}`;
+  const cur = store.data.HabitLog.get(key);
+  store.update('HabitLog', key, { habit_id: habitId, day, done: !(cur && cur.done) });
+}
+
 /** Has the period ended without a review? */
 export function reviewDue(period, day = today()) {
   const e = P.end(period);

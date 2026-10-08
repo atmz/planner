@@ -1,5 +1,5 @@
 import { suite, eq, ok } from './harness.js';
-import { TAB_NAMES } from '../js/schema.js';
+import { TAB_NAMES, TABS } from '../js/schema.js';
 
 const mem = new Map();
 globalThis.localStorage ??= { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: k => mem.delete(k), clear: () => mem.clear() };
@@ -20,7 +20,7 @@ function fakeBackend({ queueKey = 'planner-queue:test', remote = {}, onAppend, o
     async append(tab, rec, opts) { if (onAppend) await onAppend(tab, rec, opts); db[tab].push(clone(rec)); return rec; },
     async update(tab, key, patch, baseAt, full) {
       if (onUpdate) await onUpdate(tab, key, patch);
-      const k = tab === 'Periods' ? 'period' : tab === 'Settings' ? 'key' : 'id';
+      const k = TABS[tab].key;
       const i = db[tab].findIndex(r => r[k] === key);
       if (i < 0) { db[tab].push({ ...full, ...patch }); return { ...full, ...patch }; }
       db[tab][i] = { ...db[tab][i], ...patch };
@@ -151,5 +151,30 @@ suite('calendar: creating and editing events', t => {
     const n = cal.normalise({ id: 'i_2026', recurringEventId: 'i', summary: 'Standup', location: 'Room 1', start: { dateTime: new Date(2026, 9, 9, 9, 30).toISOString() }, end: { dateTime: new Date(2026, 9, 9, 9, 45).toISOString() } }, 'fam');
     eq([n.calendarId, n.recurring, n.location, n.startTime, n.endTime, n.editable], ['fam', true, 'Room 1', '09:30', '09:45', true]);
     eq(cal.normalise({ id: 'h', summary: 'Holiday', start: { date: '2026-12-25' }, end: { date: '2026-12-26' } }, 'hol').editable, false);
+  });
+});
+
+suite('store: habits', t => {
+  t('toggleHabit ticks and unticks a day, saving one log row', async () => {
+    localStorage.clear();
+    const be = fakeBackend();
+    await store.init(be);
+    const { toggleHabit, habitLog } = await import('../js/store.js');
+    const h = store.add('Habits', { title: 'No alcohol', schedule: 'daily' });
+    toggleHabit(h.id, '2026-10-08');
+    ok(habitLog().has(`${h.id}|2026-10-08`));
+    await settle();
+    toggleHabit(h.id, '2026-10-08');
+    ok(!habitLog().has(`${h.id}|2026-10-08`));
+    await settle();
+    eq(be.db.HabitLog.length, 1);
+    eq([be.db.HabitLog[0].key, be.db.HabitLog[0].done], [`${h.id}|2026-10-08`, false]);
+  });
+  t('habits() lists active habits in order', async () => {
+    const { habits } = await import('../js/store.js');
+    store.add('Habits', { title: 'B', order: 2 });
+    store.add('Habits', { title: 'Old', order: 0, archived: true });
+    store.add('Habits', { title: 'A', order: 1 });
+    eq(habits().map(h => h.title).filter(x => x !== 'No alcohol'), ['A', 'B']);
   });
 });

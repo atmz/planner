@@ -24,15 +24,16 @@ import * as lists from './ui/lists.js';
 import * as inbox from './ui/inbox.js';
 import * as review from './ui/review.js';
 import * as settings from './ui/settings.js';
+import * as habitsUi from './ui/habits.js';
 
 const VIEWS = {
   day: day.render, week: week.render, month: month.render, quarter: quarter.render, year: year.render,
   todos: todos.render, trips: trips.renderList, trip: trips.renderTrip,
   goals: goals.renderList, goal: goals.renderGoal, projects: projects.renderBoard, project: projects.renderProject,
   lists: lists.renderLists, list: lists.renderList, inbox: inbox.renderInbox, someday: inbox.renderSomeday,
-  review: review.render, settings: settings.render,
+  review: review.render, settings: settings.render, habits: habitsUi.renderHabits,
 };
-const NAV = [['todos', 'Todos'], ['trips', 'Trips'], ['goals', 'Goals'], ['projects', 'Projects'], ['lists', 'Lists'], ['inbox', 'Inbox']];
+const NAV = [['todos', 'Todos'], ['habits', 'Habits'], ['trips', 'Trips'], ['goals', 'Goals'], ['projects', 'Projects'], ['lists', 'Lists'], ['inbox', 'Inbox']];
 
 const isMock = new URLSearchParams(location.search).has('mock') || window.PLANNER_DEMO === true;
 const SHEET_KEY = 'planner-spreadsheet-id';
@@ -197,7 +198,7 @@ function reviewBadge(period) {
   if (t === 'day') return null;
   const cur = P.periodOf(t, P.today());
   const prev = P.prev(cur);
-  if (reviewDue(prev)) return h('a.badge', { href: `#/review/${prev}`, title: 'This period ended without a review' }, `Review ${P.relLabel(prev).toLowerCase()} due`);
+  if (reviewDue(prev)) return h('a.badge', { href: `#/review/${prev}`, title: 'This period ended without a review' }, `Review ${P.relLabel(prev).toLowerCase()}`);
   return null;
 }
 
