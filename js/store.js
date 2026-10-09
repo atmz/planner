@@ -325,7 +325,11 @@ export function habitLog() {
 export function toggleHabit(habitId, day) {
   const key = `${habitId}|${day}`;
   const cur = store.data.HabitLog.get(key);
-  store.update('HabitLog', key, { habit_id: habitId, day, done: !(cur && cur.done) });
+  const done = !(cur && cur.done);
+  store.update('HabitLog', key, { habit_id: habitId, day, done });
+  // Backfilling before the habit's start moves the start back, so the day counts.
+  const habit = store.get('Habits', habitId);
+  if (done && habit && habit.start && day < habit.start) store.update('Habits', habitId, { start: day });
 }
 
 /** Has the period ended without a review? */

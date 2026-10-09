@@ -182,6 +182,15 @@ const toggled = await evaluate(`(async () => {
   return document.querySelector('.habit-grid button.habit-cell[data-key="' + key + '"]').classList.contains('on');
 })()`);
 if (toggled !== true) problems.push('[habits] ticking a habit cell did not mark it: ' + toggled);
+const backfill = await evaluate(`(async () => {
+  const row = [...document.querySelectorAll('.habit-grid tbody tr')].find(r => r.textContent.includes('Smoke habit'));
+  const mon = row?.querySelector('button.habit-cell');
+  if (!mon || mon.disabled) return 'Monday cell disabled for a habit created today';
+  const key = mon.dataset.key; mon.click();
+  await new Promise(r => setTimeout(r, 400));
+  return document.querySelector('button.habit-cell[data-key="' + key + '"]').classList.contains('on') || 'not ticked';
+})()`);
+if (backfill !== true) problems.push('[habits] backfilling a new habit: ' + backfill);
 await evaluate(`document.querySelector('.habit-grid').scrollIntoView({ block: 'center' })`); await sleep(200);
 await shot('interact-habit-grid');
 await evaluate(`location.hash = '#/day'`); await sleep(500);

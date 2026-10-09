@@ -133,10 +133,10 @@ export function habitWeekGrid(week) {
         return h('tr', { class: hb.kind === 'avoid' ? 'avoid' : '' },
           h('th', h('span.habit-name', areaDot(hb), hb.title), streakLabel(hb, log)),
           days.map(d => {
-            const due = Hb.isDue(hb, d), done = Hb.isDone(hb, log, d), future = d > td;
+            const scheduled = Hb.onSchedule(hb, d), done = Hb.isDone(hb, log, d);
             return h('td', h('button.habit-cell', {
-              type: 'button', class: [done ? 'on' : '', !due ? 'off' : '', d === td ? 'today' : ''].join(' '),
-              disabled: !due || future, dataset: { key: Hb.logKey(hb.id, d) },
+              type: 'button', class: [done ? 'on' : '', !scheduled ? 'off' : '', d === td ? 'today' : ''].join(' '),
+              disabled: !Hb.canTick(hb, d, td), dataset: { key: Hb.logKey(hb.id, d) },
               'aria-pressed': String(done), 'aria-label': `${hb.title}, ${P.fmtDay(d)}${done ? ', done' : ''}`,
               onclick: () => toggleHabit(hb.id, d),
             }, done ? '✓' : ''));
@@ -147,7 +147,7 @@ export function habitWeekGrid(week) {
 
 /** Today's habits as checkboxes, for the Day view. */
 export function habitsPanel(day) {
-  const list = habits().filter(hb => Hb.isDue(hb, day));
+  const list = habits().filter(hb => Hb.onSchedule(hb, day));
   if (!list.length) return null;
   const log = habitLog();
   const future = day > today();

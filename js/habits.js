@@ -16,6 +16,12 @@ export function isDue(h, day) {
   return true;
 }
 
+/** Scheduled on this weekday at all (ignores the start date). */
+export const onSchedule = (h, day) => isDue({ ...h, start: '' }, day);
+
+/** Can this day be ticked? Any past or current day the habit is scheduled for, even before its start (backfilling). */
+export const canTick = (h, day, today) => day <= today && onSchedule(h, day);
+
 export function weeklyTarget(h) {
   if (h.schedule === 'days') return scheduledDays(h).length || 1;
   if (h.schedule === 'weekly') return Math.max(1, Math.min(7, Number(h.target) || 1));

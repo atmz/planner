@@ -79,3 +79,13 @@ suite('habits: streaks', t => {
     eq(h, [{ day: '2026-10-06', done: false, due: true }, { day: '2026-10-07', done: false, due: true }, { day: '2026-10-08', done: true, due: true }]);
   });
 });
+
+suite('habits: tickable days', t => {
+  const fresh = { id: 'f', schedule: 'days', days: 'mon,wed,fri', start: '2026-10-09' };
+  t('past days before the start can be ticked; unscheduled weekdays and the future cannot', () => {
+    ok(Hb.canTick(fresh, '2026-10-05', today), 'Mon before start');
+    ok(!Hb.canTick(fresh, '2026-10-06', today), 'Tue not scheduled');
+    ok(!Hb.canTick(fresh, '2026-10-12', today), 'future');
+    ok(Hb.canTick(daily, '2026-08-01', today), 'daily, long before start');
+  });
+});

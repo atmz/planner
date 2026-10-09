@@ -178,3 +178,21 @@ suite('store: habits', t => {
     eq(habits().map(h => h.title).filter(x => x !== 'No alcohol'), ['A', 'B']);
   });
 });
+
+suite('store: habit backfill', t => {
+  t('ticking a day before the start moves the start back', async () => {
+    localStorage.clear();
+    await store.init(fakeBackend());
+    const { toggleHabit, habitLog } = await import('../js/store.js');
+    const h = store.add('Habits', { title: 'Bike', schedule: 'daily', start: '2026-10-09' });
+    toggleHabit(h.id, '2026-10-05');
+    ok(habitLog().has(`${h.id}|2026-10-05`));
+    eq(store.get('Habits', h.id).start, '2026-10-05');
+  });
+  t('ticking after the start leaves it alone', async () => {
+    const { toggleHabit } = await import('../js/store.js');
+    const h = store.add('Habits', { title: 'Read', schedule: 'daily', start: '2026-10-01' });
+    toggleHabit(h.id, '2026-10-05');
+    eq(store.get('Habits', h.id).start, '2026-10-01');
+  });
+});
