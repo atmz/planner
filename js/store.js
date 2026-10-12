@@ -5,7 +5,7 @@
 //   update(tab, key, patch, baseAt, full) → record as now stored (merged with the remote row)
 import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
 import * as P from './periods.js';
-import { parseMealInput, copyWeekPlan } from './meals.js';
+import { parseMealInput, copyWeekPlan, cleanTitle } from './meals.js';
 
 const QUEUE_KEY = 'planner-queue';
 const lsGet = k => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } };
@@ -345,9 +345,36 @@ export function addMeal(text, { day, slot, who = 'all' }) {
   let recipeId = parsed.recipe_id;
   if (!recipeId && parsed.url) {
     recipeId = store.add('Recipes', { title: parsed.title, url: parsed.url, who }).id;
+    fetchRecipeTitle(recipeId);
   }
   const order = store.all('Meals').filter(m => m.day === day && m.slot === slot).length;
   return store.add('Meals', { day, slot, who, title: parsed.title, url: parsed.url, recipe_id: recipeId, order });
+}
+
+/** Add to the recipe box from a pasted link or a name. → { recipe, existing } or null. */
+export function addRecipe(text, who = 'all') {
+  const parsed = parseMealInput(text, store.all('Recipes'));
+  if (!parsed) return null;
+  if (parsed.recipe_id) return { recipe: store.get('Recipes', parsed.recipe_id), existing: true };
+  const recipe = store.add('Recipes', { title: parsed.title, url: parsed.url, who });
+  if (parsed.url) fetchRecipeTitle(recipe.id);
+  return { recipe, existing: false };
+}
+
+/**
+ * Replace a recipe's guessed name with the page's real title, when the backend can look it up.
+ * Never overwrites a name that was changed meanwhile; meals still showing the guess are renamed too.
+ */
+export async function fetchRecipeTitle(recipeId) {
+  const r = store.get('Recipes', recipeId);
+  if (!r?.url || !backend?.lookupTitle) return;
+  const guessed = r.title;
+  let title;
+  try { title = cleanTitle(await backend.lookupTitle(r.url)); } catch { return; }
+  const now = store.get('Recipes', recipeId);
+  if (!title || !now || now.title !== guessed || title === guessed) return;
+  store.update('Recipes', recipeId, { title });
+  for (const m of store.all('Meals')) if (m.recipe_id === recipeId && m.title === guessed) store.update('Meals', m.id, { title });
 }
 
 /** Copy one week's meal plan into another. Returns how many meals were added. */

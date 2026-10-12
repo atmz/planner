@@ -3,7 +3,7 @@
 
 const colNum = s => [...s].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
 
-export function fakeSheets(initial = {}) {
+export function fakeSheets(initial = {}, opts = {}) {
   const tabs = new Map(Object.entries(initial).map(([k, rows]) => [k, rows.map(r => [...r])]));
   const ids = new Map([...tabs.keys()].map((k, i) => [k, i + 1]));
   const log = [];
@@ -15,7 +15,10 @@ export function fakeSheets(initial = {}) {
     if (!tabs.has(tab)) throw Object.assign(new Error('Unable to parse range: ' + raw), { status: 400 });
     return { tab, c1: m[2] ? colNum(m[2]) : 1, r1: m[3] ? Number(m[3]) : 1, c2: m[4] ? colNum(m[4]) : null, r2: m[5] ? Number(m[5]) : null };
   }
-  const render = (v, opt) => (opt === 'UNFORMATTED_VALUE' ? v : v === true ? 'TRUE' : v === false ? 'FALSE' : String(v));
+  const render = (v, opt) => {
+    if (typeof v === 'string' && v.startsWith('=') && opts.formula) return opts.formula(v);
+    return opt === 'UNFORMATTED_VALUE' ? v : v === true ? 'TRUE' : v === false ? 'FALSE' : String(v);
+  };
   function read(raw, opt) {
     const { tab, c1, r1, c2, r2 } = parseRange(raw);
     const rows = tabs.get(tab);

@@ -1,7 +1,7 @@
 // Meals: weekly meal plan (Everyone / Us / Kids per slot), eaten tracking, and the recipe box.
 import * as P from '../periods.js';
 import * as M from '../meals.js';
-import { store, addMeal, copyWeek, today } from '../store.js';
+import { store, addMeal, addRecipe, copyWeek, today } from '../store.js';
 import { h, section, empty, selectEl, modal, confirmAction, toast, safeHref, isMobile } from './components.js';
 
 let recipeFilter = '';
@@ -141,10 +141,9 @@ function recipeBox(week) {
   const list = all.filter(r => !q || `${r.title} ${r.tags} ${r.notes}`.toLowerCase().includes(q));
   const add = h('input.add-line', { type: 'text', placeholder: 'Paste a recipe link (or type a name)', 'aria-label': 'Add a recipe' });
   const addRecipe = () => {
-    const p = M.parseMealInput(add.value, all);
-    if (!p) return;
-    if (p.recipe_id) { toast('Already in the recipe box'); add.value = ''; return; }
-    store.add('Recipes', { title: p.title, url: p.url, who: 'all' });
+    const r = addRecipe(add.value);
+    if (!r) return;
+    if (r.existing) toast(`Already in the recipe box: ${r.recipe.title}`);
     add.value = '';
   };
   add.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addRecipe(); } });

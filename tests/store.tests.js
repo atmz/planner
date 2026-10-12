@@ -221,3 +221,39 @@ suite('store: meals', t => {
     eq(store.all('Meals').filter(m => m.day >= '2026-10-19').map(m => m.day).sort(), ['2026-10-19', '2026-10-20', '2026-10-21']);
   });
 });
+
+suite('store: recipe titles from the web', t => {
+  t('the guessed name is replaced by the page title, on the recipe and its meals', async () => {
+    localStorage.clear();
+    const be = fakeBackend();
+    be.lookupTitle = async () => 'Grandma’s Lasagne Recipe | Example Kitchen';
+    await store.init(be);
+    const { addMeal } = await import('../js/store.js');
+    const m = addMeal('https://example.com/recipes/lasagne-123', { day: '2026-10-12', slot: 'dinner' });
+    eq(m.title, 'Lasagne 123');
+    await tick(20);
+    eq(store.get('Recipes', m.recipe_id).title, 'Grandma’s Lasagne');
+    eq(store.get('Meals', m.id).title, 'Grandma’s Lasagne');
+  });
+  t('a name you changed in the meantime is kept', async () => {
+    localStorage.clear();
+    const be = fakeBackend();
+    let release;
+    be.lookupTitle = () => new Promise(r => { release = () => r('Fetched Name | Site'); });
+    await store.init(be);
+    const { addMeal } = await import('../js/store.js');
+    const m = addMeal('https://example.com/recipes/stew', { day: '2026-10-12', slot: 'dinner' });
+    store.update('Recipes', m.recipe_id, { title: 'Dad’s stew' });
+    release();
+    await tick(20);
+    eq(store.get('Recipes', m.recipe_id).title, 'Dad’s stew');
+  });
+  t('no lookup available (sample data) leaves the guessed name', async () => {
+    localStorage.clear();
+    await store.init(fakeBackend());
+    const { addMeal } = await import('../js/store.js');
+    const m = addMeal('https://example.com/recipes/pie', { day: '2026-10-12', slot: 'dinner' });
+    await tick(20);
+    eq(store.get('Recipes', m.recipe_id).title, 'Pie');
+  });
+});

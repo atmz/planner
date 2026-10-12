@@ -119,8 +119,42 @@ export function sheetBackend(api, spreadsheetId) {
     if (data.length) await api(`${url}/values:batchUpdate`, { method: 'POST', body: { valueInputOption: 'RAW', data } });
   }
 
+  /** A hidden scratch tab for IMPORTXML lookups. */
+  async function ensureLookupTab() {
+    if (!ensured) await ensureTabs();
+    if ('Lookup' in sheetIds) return;
+    try { await api(`${url}:batchUpdate`, { method: 'POST', body: { requests: [{ addSheet: { properties: { title: 'Lookup', hidden: true } } }] } }); }
+    catch (e) { if (e.status !== 400) throw e; }
+    sheetIds.Lookup = true;
+  }
+
   const backend = {
     name: 'sheet',
+
+    /**
+     * Fetch a web page's title using Sheets' IMPORTXML (the browser itself can't read other sites).
+     * Prefers og:title, falls back to <title>. Resolves to the raw title or null.
+     */
+    async lookupTitle(pageUrl, { pollMs = 1200, tries = 10 } = {}) {
+      await ensureLookupTab();
+      const u = String(pageUrl).replace(/"/g, '""');
+      const formula = `=IFERROR(INDEX(IMPORTXML("${u}","//meta[@property='og:title']/@content"),1),IFERROR(INDEX(IMPORTXML("${u}","//title"),1),""))`;
+      const res = await api(`${url}/values/${encodeURIComponent(`${q('Lookup')}!A1`)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, { method: 'POST', body: { values: [[formula]] } });
+      const cell = /!([A-Z]+\d+)/.exec(res.updates?.updatedRange || '')?.[1];
+      if (!cell) return null;
+      const range = encodeURIComponent(`${q('Lookup')}!${cell}`);
+      try {
+        for (let i = 0; i < tries; i++) {
+          const r = await api(`${url}/values/${range}?valueRenderOption=FORMATTED_VALUE`);
+          const v = r.values?.[0]?.[0];
+          if (v !== undefined && !/^loading/i.test(String(v))) return v ? String(v) : null;
+          await new Promise(res2 => setTimeout(res2, pollMs));
+        }
+        return null;
+      } finally {
+        await api(`${url}/values/${range}?valueInputOption=RAW`, { method: 'PUT', body: { values: [['']] } }).catch(() => {});
+      }
+    },
     queueKey: `planner-queue:sheet:${spreadsheetId}`,
 
     async loadAll() {

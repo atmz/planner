@@ -115,3 +115,25 @@ suite('sheet: types round-trip', t => {
     for (const c of ['done', 'order', 'remind_days']) ok(!cols.includes(c), `${c} is not text-formatted`);
   });
 });
+
+suite('sheet: page titles via IMPORTXML', t => {
+  t('lookupTitle writes an IMPORTXML formula to a Lookup tab, reads the result, and clears the cell', async () => {
+    const fs = fakeSheets(emptyTabs(), { formula: f => (/IMPORTXML\("https:\/\/example\.com\/r\/stew"/.test(f) ? 'Beef Stew | Example' : '#N/A') });
+    const be = sheetBackend(fs.api, 'S');
+    await be.loadAll();
+    const title = await be.lookupTitle('https://example.com/r/stew', { pollMs: 1 });
+    eq(title, 'Beef Stew | Example');
+    ok(fs.tabs.has('Lookup'), 'Lookup tab created');
+    const formulaWrite = fs.log.find(l => l.body?.values?.[0]?.[0]?.startsWith?.('='));
+    ok(formulaWrite && /valueInputOption=USER_ENTERED/.test(formulaWrite.url), 'formula written with USER_ENTERED');
+    eq(fs.tabs.get('Lookup').flat().filter(v => v !== '').length, 0, 'cell cleared afterwards');
+  });
+  t('quotes in the link cannot break out of the formula', async () => {
+    const fs = fakeSheets(emptyTabs(), { formula: () => 'x' });
+    const be = sheetBackend(fs.api, 'S');
+    await be.loadAll();
+    await be.lookupTitle('https://example.com/a"b', { pollMs: 1 });
+    const f = fs.log.find(l => l.body?.values?.[0]?.[0]?.startsWith?.('=')).body.values[0][0];
+    ok(f.includes('https://example.com/a""b') && !/a"b/.test(f.replace(/""/g, '')), f);
+  });
+});

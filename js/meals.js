@@ -66,3 +66,14 @@ export function copyWeekPlan(meals, fromWeek, toWeek) {
     recipe_id: m.recipe_id || '', notes: m.notes || '', order: m.order ?? 0, eaten: false,
   }));
 }
+
+const JUNK_TITLE = /^(loading|#n\/a|#error|#ref|just a moment|access denied|attention required|forbidden|page not found|not found|40[34]\b|error\b)/i;
+
+/** A page title tidied into a recipe name: no site name, no "Recipe" suffix, no {…}/[…] asides. Null if useless. */
+export function cleanTitle(raw) {
+  let s = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!s || JUNK_TITLE.test(s)) return null;
+  s = s.split(/\s+[|–—:]{1,2}\s+|\s+-\s+/)[0];
+  s = s.replace(/\{[^}]*\}|\[[^\]]*\]/g, ' ').replace(/\brecipes?\s*$/i, '').replace(/\s+/g, ' ').trim();
+  return s.length >= 2 ? s : null;
+}

@@ -59,3 +59,21 @@ suite('meals: plan helpers', t => {
     ok(copies.every(c => !c.id && c.eaten === false), 'fresh, uneaten');
   });
 });
+
+suite('meals: cleaning fetched page titles', t => {
+  t('drops site names and "recipe" suffixes', () => {
+    eq(M.cleanTitle('Easy chicken curry recipe | BBC Good Food'), 'Easy chicken curry');
+    eq(M.cleanTitle('Mississippi Roast Recipe - NYT Cooking'), 'Mississippi Roast');
+    eq(M.cleanTitle('Pasta Bake – Jamie Oliver'), 'Pasta Bake');
+    eq(M.cleanTitle('The Best Lasagna Recipe {Easy & Classic} | Natasha’s Kitchen'), 'The Best Lasagna');
+    eq(M.cleanTitle('  Shakshuka  '), 'Shakshuka');
+  });
+  t('keeps titles whose dash is part of the name', () => eq(M.cleanTitle('Slow-cooker beef stew'), 'Slow-cooker beef stew'));
+  t('useless titles → null', () => {
+    eq(M.cleanTitle(''), null);
+    eq(M.cleanTitle('Loading...'), null);
+    eq(M.cleanTitle('#N/A'), null);
+    eq(M.cleanTitle('Just a moment...'), null);
+    eq(M.cleanTitle('Access Denied'), null);
+  });
+});
