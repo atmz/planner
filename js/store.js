@@ -5,6 +5,7 @@
 //   update(tab, key, patch, baseAt, full) → record as now stored (merged with the remote row)
 import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
 import * as P from './periods.js';
+import { parseMealInput, copyWeekPlan } from './meals.js';
 
 const QUEUE_KEY = 'planner-queue';
 const lsGet = k => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } };
@@ -330,6 +331,30 @@ export function toggleHabit(habitId, day) {
   // Backfilling before the habit's start moves the start back, so the day counts.
   const habit = store.get('Habits', habitId);
   if (done && habit && habit.start && day < habit.start) store.update('Habits', habitId, { start: day });
+}
+
+// ---- meals
+
+/**
+ * Add what was typed into a meal slot. A new link is also saved to the recipe box (once);
+ * a known recipe name or link is linked to that recipe.
+ */
+export function addMeal(text, { day, slot, who = 'all' }) {
+  const parsed = parseMealInput(text, store.all('Recipes'));
+  if (!parsed) return null;
+  let recipeId = parsed.recipe_id;
+  if (!recipeId && parsed.url) {
+    recipeId = store.add('Recipes', { title: parsed.title, url: parsed.url, who }).id;
+  }
+  const order = store.all('Meals').filter(m => m.day === day && m.slot === slot).length;
+  return store.add('Meals', { day, slot, who, title: parsed.title, url: parsed.url, recipe_id: recipeId, order });
+}
+
+/** Copy one week's meal plan into another. Returns how many meals were added. */
+export function copyWeek(fromWeek, toWeek) {
+  const copies = copyWeekPlan(store.all('Meals'), fromWeek, toWeek);
+  for (const c of copies) store.add('Meals', c);
+  return copies.length;
 }
 
 /** Has the period ended without a review? */

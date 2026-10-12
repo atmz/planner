@@ -60,7 +60,7 @@ async function viewport(width, height, mobile = false) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
 }
 
-const ROUTES = ['habits', 'week', 'day', 'month', 'quarter', 'year', 'year/2026?rolling=1', 'todos', 'todos?group=area', 'todos?group=when', 'trips', 'goals', 'projects', 'lists', 'inbox', 'someday', 'settings', 'review/2026-W40'];
+const ROUTES = ['meals', 'habits', 'week', 'day', 'month', 'quarter', 'year', 'year/2026?rolling=1', 'todos', 'todos?group=area', 'todos?group=when', 'trips', 'goals', 'projects', 'lists', 'inbox', 'someday', 'settings', 'review/2026-W40'];
 
 await viewport(1440, 1000);
 await send('Page.navigate', { url: `${base}/index.html?mock=1` });
@@ -196,6 +196,33 @@ await shot('interact-habit-grid');
 await evaluate(`location.hash = '#/day'`); await sleep(500);
 if (!(await evaluate(`document.querySelectorAll('.habits-panel input[type=checkbox]').length > 0`))) problems.push('[habits] no habit checkboxes in the day view');
 
+currentRoute = 'interact:meals';
+await evaluate(`location.hash = '#/meals'`); await sleep(600);
+const cells = await evaluate(`document.querySelectorAll('.meal-plan .meal-cell').length`);
+if (cells !== 21) problems.push('[meals] expected 7 days × 3 meals = 21 cells, found ' + cells);
+if (!(await evaluate(`!!document.querySelector('.copy-week')`))) problems.push('[meals] no "copy last week" button');
+const mealAdded = await evaluate(`(async () => {
+  const cell = document.querySelector('.meal-cell[data-slot="dinner"]');
+  const whoBtn = cell.querySelector('.who-toggle');
+  while (whoBtn && whoBtn.dataset.who !== 'kids') { whoBtn.click(); await new Promise(r => setTimeout(r, 30)); }
+  const i = cell.querySelector('input.meal-add');
+  i.value = 'https://example.com/recipes/smoke-lasagne';
+  i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await new Promise(r => setTimeout(r, 500));
+  const entry = [...document.querySelectorAll('.meal-cell[data-slot="dinner"] .meal-entry')].find(e => e.textContent.includes('Smoke lasagne'));
+  if (!entry) return 'entry missing';
+  if (!/Kids/.test(entry.textContent)) return 'no Kids badge: ' + entry.textContent;
+  if (![...document.querySelectorAll('.recipe-box .recipe')].some(r => r.textContent.includes('Smoke lasagne'))) return 'recipe not in the box';
+  entry.querySelector('input[type=checkbox]').click();
+  await new Promise(r => setTimeout(r, 400));
+  const again = [...document.querySelectorAll('.meal-entry')].find(e => e.textContent.includes('Smoke lasagne'));
+  return again.classList.contains('eaten') || 'not marked eaten';
+})()`);
+if (mealAdded !== true) problems.push('[meals] adding a pasted recipe for the kids: ' + mealAdded);
+await shot('interact-meals');
+await evaluate(`location.hash = '#/day'`); await sleep(500);
+if (!(await evaluate(`!!document.querySelector('.meals-today')`))) problems.push('[meals] no meals panel in the day view');
+
 currentRoute = 'interact:review';
 await evaluate(`location.hash = '#/review/2026-W41'`); await sleep(400);
 for (let i = 0; i < 4; i++) { await evaluate(`[...document.querySelectorAll('.review-page .actions button.primary')].pop()?.click()`); await sleep(300); }
@@ -217,7 +244,7 @@ for (const r of ['month', 'year']) {
 
 // Phone width
 await viewport(375, 812, true);
-for (const r of ['week', 'day', 'month', 'year', 'todos', 'trips', 'projects', 'inbox']) await visit(r, 'phone');
+for (const r of ['week', 'day', 'month', 'year', 'todos', 'trips', 'projects', 'inbox', 'meals', 'habits']) await visit(r, 'phone');
 
 // Dark mode
 await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });

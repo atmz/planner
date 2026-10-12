@@ -196,3 +196,28 @@ suite('store: habit backfill', t => {
     eq(store.get('Habits', h.id).start, '2026-10-01');
   });
 });
+
+suite('store: meals', t => {
+  t('adding a meal with a new link saves the recipe once and links it', async () => {
+    localStorage.clear();
+    const be = fakeBackend();
+    await store.init(be);
+    const { addMeal } = await import('../js/store.js');
+    const m1 = addMeal('https://x.com/recipes/pasta-bake', { day: '2026-10-12', slot: 'dinner', who: 'kids' });
+    eq([m1.title, m1.who, m1.slot, m1.day], ['Pasta bake', 'kids', 'dinner', '2026-10-12']);
+    const recipes = store.all('Recipes');
+    eq(recipes.length, 1);
+    eq([recipes[0].title, recipes[0].url, m1.recipe_id], ['Pasta bake', 'https://x.com/recipes/pasta-bake', recipes[0].id]);
+    const m2 = addMeal('https://x.com/recipes/pasta-bake', { day: '2026-10-13', slot: 'dinner', who: 'all' });
+    eq(store.all('Recipes').length, 1, 'no duplicate recipe');
+    eq(m2.recipe_id, recipes[0].id);
+    const m3 = addMeal('Leftovers', { day: '2026-10-14', slot: 'lunch', who: 'all' });
+    eq([m3.title, m3.recipe_id, store.all('Recipes').length], ['Leftovers', '', 1]);
+  });
+  t('copyWeek adds the previous week’s meals to this week', async () => {
+    const { copyWeek } = await import('../js/store.js');
+    const n = copyWeek('2026-W42', '2026-W43');
+    eq(n, 3);
+    eq(store.all('Meals').filter(m => m.day >= '2026-10-19').map(m => m.day).sort(), ['2026-10-19', '2026-10-20', '2026-10-21']);
+  });
+});

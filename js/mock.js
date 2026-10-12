@@ -3,7 +3,7 @@
 import * as P from './periods.js';
 import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
 
-const KEY = 'planner-mock-v3';
+const KEY = 'planner-mock-v4';
 const EV_KEY = 'planner-mock-events-v3';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* ignore */ } };
@@ -116,6 +116,28 @@ function generate(T = P.today()) {
     if ([0, 2, 4].includes(wd) && i % 11 !== 3) tick(hGym);
     if (i % 3 !== 0) tick(hRead);
   }
+
+  // Recipe box + two weeks of meals (grown-ups and kids sometimes eat different things)
+  const recipe = (title, slug, who = 'all', tags = '') => add('Recipes', { title, url: `https://example.com/recipes/${slug}`, who, tags });
+  const rCurry = recipe('Thai green curry', 'thai-green-curry', 'adults', 'spicy');
+  const rFish = recipe('Fish fingers & peas', 'fish-fingers', 'kids', 'quick');
+  const rBolo = recipe('Spaghetti bolognese', 'spaghetti-bolognese', 'all', 'batch');
+  const rTacos = recipe('Chicken tacos', 'chicken-tacos', 'all', 'quick');
+  const rSalmon = recipe('Miso salmon & greens', 'miso-salmon', 'adults', 'quick');
+  const rPizza = recipe('Homemade pizza', 'homemade-pizza', 'all', 'weekend');
+  const rPorridge = recipe('Porridge & berries', 'porridge', 'all', 'breakfast');
+  const rMac = recipe('Mac & cheese', 'mac-and-cheese', 'kids', '');
+  const meal = (offset, slot, r, who) => add('Meals', { day: d(offset), slot, who: who || r.who || 'all', title: r.title, url: r.url, recipe_id: r.id, eaten: offset < 0 });
+  const wkStart = P.diffDays(T, P.start(week)); // days from today back to Monday (negative or 0)
+  for (const base of [wkStart - 7, wkStart]) {
+    meal(base, 'breakfast', rPorridge); meal(base + 2, 'breakfast', rPorridge); meal(base + 5, 'breakfast', rPorridge);
+    meal(base, 'dinner', rCurry, 'adults'); meal(base, 'dinner', rFish, 'kids');
+    meal(base + 1, 'dinner', rBolo);
+    meal(base + 2, 'dinner', rSalmon, 'adults'); meal(base + 2, 'dinner', rMac, 'kids');
+    meal(base + 3, 'dinner', rTacos);
+    meal(base + 5, 'dinner', rPizza);
+  }
+  add('Meals', { day: d(1), slot: 'lunch', who: 'all', title: 'Leftover bolognese', eaten: false });
 
   // Period pages
   db.Periods.push(

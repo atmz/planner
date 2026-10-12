@@ -7,6 +7,7 @@ import { dueSoonStrip, tripBanners, calRange, holidayLabels, dueMarkers, eventCh
 import * as cal from '../calendar.js';
 import { openCapture } from './event.js';
 import { habitsPanel } from './habits.js';
+import { mealsToday } from './meals.js';
 
 const KIND_ICON = { flight: '✈', stay: '🛏', transport: '🚗', activity: '★', food: '🍴', note: '✎' };
 
@@ -67,6 +68,7 @@ export function render(day) {
         })) : null),
       h('div.page-paper.right',
         section(h('span', 'Schedule' + (loading ? ' …' : ''), cal.available() ? addEventButton(day) : null), timeline(events, day)),
+        mealsToday(day),
         tripItems.length ? section('Trip plans', h('ul.trip-items', tripItems.map(i => h('li',
           h('span.kind', KIND_ICON[i.kind] || '•'), ' ',
           i.date < day ? h('span', 'Staying: ') : (i.time ? h('span.ev-time', i.time + ' ') : null),

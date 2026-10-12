@@ -25,15 +25,16 @@ import * as inbox from './ui/inbox.js';
 import * as review from './ui/review.js';
 import * as settings from './ui/settings.js';
 import * as habitsUi from './ui/habits.js';
+import * as mealsUi from './ui/meals.js';
 
 const VIEWS = {
   day: day.render, week: week.render, month: month.render, quarter: quarter.render, year: year.render,
   todos: todos.render, trips: trips.renderList, trip: trips.renderTrip,
   goals: goals.renderList, goal: goals.renderGoal, projects: projects.renderBoard, project: projects.renderProject,
   lists: lists.renderLists, list: lists.renderList, inbox: inbox.renderInbox, someday: inbox.renderSomeday,
-  review: review.render, settings: settings.render, habits: habitsUi.renderHabits,
+  review: review.render, settings: settings.render, habits: habitsUi.renderHabits, meals: mealsUi.renderMeals,
 };
-const NAV = [['todos', 'Todos'], ['habits', 'Habits'], ['trips', 'Trips'], ['goals', 'Goals'], ['projects', 'Projects'], ['lists', 'Lists'], ['inbox', 'Inbox']];
+const NAV = [['todos', 'Todos'], ['habits', 'Habits'], ['meals', 'Meals'], ['trips', 'Trips'], ['goals', 'Goals'], ['projects', 'Projects'], ['lists', 'Lists'], ['inbox', 'Inbox']];
 
 const isMock = new URLSearchParams(location.search).has('mock') || window.PLANNER_DEMO === true;
 const SHEET_KEY = 'planner-spreadsheet-id';
@@ -238,7 +239,7 @@ function signOut(force = false) {
 function typing() {
   const a = document.activeElement;
   // Add-lines commit on Enter and are restored after a render, so they don't block one.
-  if (a?.matches?.('input.add-line')) return false;
+  if (a?.matches?.('input.add-line, input.meal-add')) return false;
   return a && document.getElementById('main')?.contains(a) && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || (a.tagName === 'INPUT' && !['checkbox', 'radio', 'button'].includes(a.type)));
 }
 
@@ -255,7 +256,7 @@ function render() {
   if (!main) return;
   const fn = VIEWS[route.view];
   const y = window.scrollY;
-  const focusedAdd = document.activeElement?.matches?.('input.add-line') ? document.activeElement.placeholder : null;
+  const focusedAdd = document.activeElement?.matches?.('input.add-line, input.meal-add') ? document.activeElement.getAttribute('aria-label') : null;
   main.className = `view-${route.view}`;
   try {
     main.replaceChildren(fn ? fn(route.param, route.query) : h('div.page', h('h2', 'Not found'), h('a', { href: '#/' }, 'Back to this week')));
@@ -264,7 +265,7 @@ function render() {
     main.replaceChildren(h('div.page', h('h2', 'Something went wrong'), h('pre.code', e.stack || e.message)));
   }
   window.scrollTo(0, y);
-  if (focusedAdd) main.querySelector(`input.add-line[placeholder="${CSS.escape(focusedAdd)}"]`)?.focus();
+  if (focusedAdd) main.querySelector(`input[aria-label="${CSS.escape(focusedAdd)}"]`)?.focus();
 }
 
 // ---------------------------------------------------------------------------

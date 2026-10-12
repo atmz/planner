@@ -159,3 +159,11 @@ suite('schema: habits', t => {
     eq(fromRow('HabitLog', ['h1|2026-10-08', 46303], ['key', 'day']).day, '2026-10-08');
   });
 });
+
+suite('schema: meals', t => {
+  t('Meals and Recipes tabs', () => {
+    for (const c of ['day', 'slot', 'who', 'title', 'url', 'recipe_id', 'eaten', 'notes']) ok(TABS.Meals.columns.includes(c), c);
+    for (const c of ['title', 'url', 'who', 'tags', 'notes']) ok(TABS.Recipes.columns.includes(c), c);
+    eq(fromRow('Meals', ['m', 'TRUE'], ['id', 'eaten']).eaten, true);
+  });
+});

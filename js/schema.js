@@ -24,11 +24,13 @@ export const TABS = {
   Settings: { key: 'key', columns: ['key', 'value', 'updated_at'] },
   Habits: { key: 'id', columns: ['id', 'title', 'kind', 'schedule', 'days', 'target', 'area_id', 'color', 'start', 'order', 'archived', 'notes', ...AUDIT] },
   HabitLog: { key: 'key', columns: ['key', 'habit_id', 'day', 'done', 'note', 'updated_at'] },
+  Meals: { key: 'id', columns: ['id', 'day', 'slot', 'who', 'title', 'url', 'recipe_id', 'notes', 'eaten', 'order', ...AUDIT] },
+  Recipes: { key: 'id', columns: ['id', 'title', 'url', 'who', 'tags', 'notes', ...AUDIT] },
 };
 
 export const TAB_NAMES = Object.keys(TABS);
 
-const BOOL = new Set(['done', 'deleted', 'archived']);
+const BOOL = new Set(['done', 'deleted', 'archived', 'eaten']);
 const NUM = new Set(['order', 'progress', 'remind_days', 'cost', 'target']);
 const DATE = new Set(['due', 'start', 'end', 'date', 'end_date', 'day']);
 const PERIOD = new Set(['when', 'target']);
