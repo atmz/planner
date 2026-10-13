@@ -342,3 +342,39 @@ suite('store: two people, one sheet', t => {
     ok(!store.readOnly(), 'editable');
   });
 });
+
+suite('store: who you are comes from the Google account', t => {
+  const remote = {
+    Settings: [{ key: 'people', value: 'Sam, Jo' }, { key: 'email|Jo', value: 'Jo@Example.com' }],
+    Tasks: [{ id: 't1', title: 'Sam’s' }, { id: 't2', title: 'Jo’s', owner: 'Jo' }],
+  };
+  t('a linked account is that person, whatever this device chose before', async () => {
+    localStorage.clear();
+    localStorage.setItem('planner-me', 'Sam');
+    await store.init(fakeBackend({ remote }));
+    store.setAccount('jo@example.com');
+    eq(store.me(), 'Jo');
+    ok(store.knowsMe(), 'no need to ask');
+    eq(store.all('Tasks').map(x => x.id), ['t2']);
+  });
+  t('an unlinked account is asked once; the answer is saved in the sheet', async () => {
+    localStorage.clear();
+    const be = fakeBackend({ remote });
+    await store.init(be);
+    store.setAccount('sam@example.com');
+    ok(!store.knowsMe(), 'should ask');
+    store.setMe('Sam');
+    await settle();
+    eq(be.db.Settings.find(s => s.key === 'email|Sam')?.value, 'sam@example.com');
+    ok(store.knowsMe(), 'linked');
+    eq(store.accountOf('Sam'), 'sam@example.com');
+  });
+  t('linking an account moves it off any other name', async () => {
+    localStorage.clear();
+    await store.init(fakeBackend({ remote }));
+    store.setAccount('jo@example.com');
+    store.setMe('Sam');
+    eq(store.me(), 'Sam');
+    eq(store.accountOf('Jo'), '');
+  });
+});

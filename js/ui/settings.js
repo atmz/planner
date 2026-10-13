@@ -1,4 +1,4 @@
-// Settings: calendars (shown + background), review day, reminders, areas.
+// Settings: people, calendars (shown + background), review day, reminders, areas.
 import { store } from '../store.js';
 import * as cal from '../calendar.js';
 import { resetMock } from '../mock.js';
@@ -57,7 +57,8 @@ function peopleEditor() {
           if (people.length && names[0] !== people[0]) return toast('Keep the first name first — existing rows belong to them.');
           store.setSetting('people', names.join(', '));
         }, { placeholder: 'e.g. Sam, Jo', 'aria-label': 'People' })),
-      people.length > 1 ? h('label.field', h('span', 'This device is'), selectEl(people.map(p => [p, p]), store.me(), v => store.setMe(v))) : null));
+      people.length > 1 ? h('label.field', h('span', store.account ? `You (${store.account}) are` : 'This device is'), selectEl(people.map(p => [p, p]), store.me(), v => store.setMe(v))) : null),
+    people.length > 1 ? h('p.muted.small', people.map(p => `${p}: ${store.accountOf(p) || 'not signed in yet'}`).join(' · ')) : null);
 }
 
 export function render() {

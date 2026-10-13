@@ -144,6 +144,11 @@ export const updateTripEvent = trip => provider.patch('primary', trip.event_id, 
 export function googleProvider(api) {
   const base = 'https://www.googleapis.com/calendar/v3';
   return {
+    /** The signed-in account's email (the primary calendar's id), using the calendar permission we already have. */
+    async accountEmail() {
+      const r = await api(`${base}/calendars/primary?fields=id`);
+      return r.id || '';
+    },
     async listCalendars() {
       const r = await api(`${base}/users/me/calendarList?maxResults=250`);
       return r.items || [];

@@ -80,11 +80,13 @@ async function boot() {
 
 async function afterSignIn() {
   if (!spreadsheetId()) return screen(firstRunScreen());
-  cal.setProvider(cal.googleProvider(auth.api));
-  await start(sheetBackend(auth.api, spreadsheetId()));
+  const provider = cal.googleProvider(auth.api);
+  cal.setProvider(provider);
+  const email = provider.accountEmail().catch(e => { console.warn('[planner] couldn’t read the account email', e); return ''; });
+  await start(sheetBackend(auth.api, spreadsheetId()), email);
 }
 
-async function start(backend) {
+async function start(backend, email = Promise.resolve('')) {
   screen(messageScreen('Opening your planner…', ''));
   try { await store.init(backend); }
   catch (e) {
@@ -106,18 +108,18 @@ async function start(backend) {
   setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 60_000);
   matchMedia('screen and (max-width: 760px)').addEventListener('change', () => render());
   render();
+  store.setAccount(await email);
   askWhoIAm();
 }
 
 /** First visit on a device with several people: ask whose planner this is (remembered per device). */
 function askWhoIAm() {
   const people = store.people();
-  let known = null;
-  try { known = localStorage.getItem('planner-me'); } catch { /* ignore */ }
-  if (isMock || people.length < 2 || people.includes(known)) return;
+  if (isMock || store.knowsMe()) return;
   modal(close => h('div.editor',
     h('h3', 'Who’s using this planner?'),
-    h('p.muted', 'Your own todos, goals and habits are editable; the others’ are read-only. Meals and trips are shared. You can change this in Settings.'),
+    h('p.muted', store.account ? `Signed in as ${store.account}. You’ll only be asked once for this account.` : 'Remembered on this device.',
+      ' Your own todos, goals and habits are editable; the others’ are read-only. Meals and trips are shared.'),
     h('div.actions', people.map(p => h('button.primary', { type: 'button', onclick: () => { store.setMe(p); close(); } }, p)))));
 }
 

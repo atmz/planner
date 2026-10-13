@@ -165,9 +165,30 @@ export const store = {
     if (v !== this._peopleRaw) { this._peopleRaw = v; this._people = v.split(',').map(s => s.trim()).filter(Boolean); }
     return this._people;
   },
-  /** Who uses this device: remembered per device, else the first person. */
-  me() { const ps = this.people(); const m = lsGet(ME_KEY); return ps.includes(m) ? m : ps[0] || ''; },
-  setMe(name) { lsSet(ME_KEY, name); this.viewing = null; this.emit('data'); },
+  account: '', // the signed-in Google account's email, when known
+  setAccount(email) { this.account = String(email || '').toLowerCase(); this.emit('data'); },
+  accountOf(person) { return String(this.data.Settings.get(`email|${person}`)?.value || '').toLowerCase(); },
+  _accountPerson() { return this.account ? this.people().find(p => this.accountOf(p) === this.account) : undefined; },
+  /** Who you are: the person linked to the signed-in account, else this device's choice, else the first person. */
+  me() {
+    const ps = this.people();
+    const linked = this._accountPerson();
+    if (linked) return linked;
+    const m = lsGet(ME_KEY);
+    return ps.includes(m) ? m : ps[0] || '';
+  },
+  /** Is "me" settled (linked to the account, or chosen on this device when there's no account)? */
+  knowsMe() { return this.people().length < 2 || !!this._accountPerson() || (!this.account && this.people().includes(lsGet(ME_KEY))); },
+  /** Say who you are; with a signed-in account, the link is saved in the sheet so no device asks again. */
+  setMe(name) {
+    lsSet(ME_KEY, name);
+    if (this.account) {
+      for (const p of this.people()) if (p !== name && this.accountOf(p) === this.account) this.setSetting(`email|${p}`, '');
+      if (this.accountOf(name) !== this.account) this.setSetting(`email|${name}`, this.account);
+    }
+    this.viewing = null;
+    this.emit('data');
+  },
   viewer() { return this.viewing || this.me(); },
   view(person) { this.viewing = person && person !== this.me() ? person : null; this.emit('data'); },
   readOnly() { return !!this.viewing && this.viewing !== this.me(); },

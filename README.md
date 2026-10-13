@@ -11,7 +11,7 @@ The OAuth client ID and spreadsheet ID in `js/config.js` are not secrets: sign-i
 
 ## Two people
 
-Share the sheet as **Editor** with the other person and add them as a test user on the OAuth consent screen. Then in **Settings → People** enter the names, first person first (rows from before people were added belong to them). Each device asks once who is using it.
+Share the sheet as **Editor** with the other person and add them as a test user on the OAuth consent screen. Then in **Settings → People** enter the names, first person first (rows from before people were added belong to them). The first time each Google account signs in, the planner asks which name it is and saves the link in the sheet, so no other device asks again.
 
 - Todos, goals, projects, lists, habits and period notes/reviews belong to one person. You can switch to the other person's planner to read it, but the planner won't change their rows.
 - **+ Name** (or `o`) shows the other person's todos on your own day, week and month pages.
