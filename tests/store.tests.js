@@ -257,3 +257,88 @@ suite('store: recipe titles from the web', t => {
     eq(store.get('Recipes', m.recipe_id).title, 'Pie');
   });
 });
+
+suite('store: two people, one sheet', t => {
+  const remote = {
+    Settings: [{ key: 'people', value: 'Sam, Jo' }],
+    Tasks: [
+      { id: 't1', title: 'Old row (no owner) is the first person’s', when: '2026-10-13' },
+      { id: 't2', title: 'Jo’s task', when: '2026-10-13', owner: 'Jo' },
+    ],
+    Periods: [{ period: '2026-W42', focus_1: 'Sam focus' }, { period: 'Jo|2026-W42', focus_1: 'Jo focus', owner: 'Jo' }],
+    Trips: [{ id: 'tr', title: 'Shared trip', start: '2026-11-01', end: '2026-11-03' }],
+  };
+  const setup = async (me = 'Sam') => {
+    localStorage.clear();
+    localStorage.setItem('planner-me', me);
+    const be = fakeBackend({ remote });
+    await store.init(be);
+    store.view(null);
+    return be;
+  };
+
+  t('people come from settings; this device remembers who it is', async () => {
+    await setup('Jo');
+    eq(store.people(), ['Sam', 'Jo']);
+    eq(store.me(), 'Jo');
+    store.setMe('Sam');
+    eq(store.me(), 'Sam');
+  });
+  t('you see your own rows; blank owner means the first person', async () => {
+    await setup('Sam');
+    eq(store.all('Tasks').map(x => x.id), ['t1']);
+    await setup('Jo');
+    eq(store.all('Tasks').map(x => x.id), ['t2']);
+    eq(store.get('Tasks', 't1'), null);
+  });
+  t('shared tabs are the same for everyone', async () => {
+    await setup('Jo');
+    eq(store.all('Trips').map(x => x.id), ['tr']);
+  });
+  t('allOf reads another person’s rows (for the overlay)', async () => {
+    await setup('Sam');
+    eq(store.allOf('Tasks', 'Jo').map(x => x.id), ['t2']);
+  });
+  t('new rows belong to you', async () => {
+    const be = await setup('Jo');
+    store.add('Tasks', { title: 'Mine' });
+    await settle();
+    eq(be.db.Tasks.at(-1).owner, 'Jo');
+  });
+  t('period notes are per person', async () => {
+    const be = await setup('Sam');
+    eq(store.period('2026-W42').focus_1, 'Sam focus');
+    store.view('Jo');
+    eq(store.period('2026-W42').focus_1, 'Jo focus');
+    store.view(null);
+    await setup('Jo');
+    store.setPeriod('2026-W43', { notes: 'hi' });
+    await settle();
+    const row = be.db.Periods.find(p => p.notes === 'hi') || store.data.Periods.get('Jo|2026-W43');
+    eq([row.period, row.owner], ['Jo|2026-W43', 'Jo']);
+  });
+  t('viewing someone else shows their rows and makes them read-only', async () => {
+    const be = await setup('Sam');
+    let blocked = 0;
+    const off = store.subscribe(k => { if (k === 'readonly') blocked++; });
+    store.view('Jo');
+    ok(store.readOnly(), 'read-only');
+    eq(store.all('Tasks').map(x => x.id), ['t2']);
+    eq(store.add('Tasks', { title: 'nope' }), null);
+    store.update('Tasks', 't2', { done: true });
+    eq(store.get('Tasks', 't2').done, undefined);
+    eq(blocked, 2);
+    store.add('Meals', { day: '2026-10-13', slot: 'dinner', title: 'Shared still editable' });
+    await settle();
+    eq(be.db.Meals.length, 1);
+    off();
+    store.view(null);
+    ok(!store.readOnly(), 'back to editable');
+  });
+  t('one person: no owners needed, everything visible and editable', async () => {
+    localStorage.clear();
+    await store.init(fakeBackend({ remote: { Tasks: remote.Tasks } }));
+    eq(store.all('Tasks').length, 2);
+    ok(!store.readOnly(), 'editable');
+  });
+});

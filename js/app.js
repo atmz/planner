@@ -8,7 +8,8 @@ import * as cal from './calendar.js';
 import { sheetBackend, createSpreadsheet } from './sheet.js';
 import { mockBackend, mockCalendarProvider } from './mock.js';
 import { parseHash, periodHash, HORIZONS, onRoute } from './router.js';
-import { h, toast } from './ui/components.js';
+import { h, toast, modal } from './ui/components.js';
+import { overlayOn, setOverlay, personColor } from './ui/shared.js';
 import { enableDragAndDrop } from './ui/task.js';
 import { openCapture } from './ui/event.js';
 import * as day from './ui/day.js';
@@ -94,6 +95,7 @@ async function start(backend) {
   enableDragAndDrop(root);
   store.subscribe(kind => {
     if (kind === 'status') return renderStatus();
+    if (kind === 'readonly') return readOnlyToast();
     scheduleRender();
   });
   onRoute(r => { route = r; render(); window.scrollTo(0, 0); });
@@ -104,6 +106,44 @@ async function start(backend) {
   setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 60_000);
   matchMedia('screen and (max-width: 760px)').addEventListener('change', () => render());
   render();
+  askWhoIAm();
+}
+
+/** First visit on a device with several people: ask whose planner this is (remembered per device). */
+function askWhoIAm() {
+  const people = store.people();
+  let known = null;
+  try { known = localStorage.getItem('planner-me'); } catch { /* ignore */ }
+  if (isMock || people.length < 2 || people.includes(known)) return;
+  modal(close => h('div.editor',
+    h('h3', 'Who’s using this planner?'),
+    h('p.muted', 'Your own todos, goals and habits are editable; the others’ are read-only. Meals and trips are shared. You can change this in Settings.'),
+    h('div.actions', people.map(p => h('button.primary', { type: 'button', onclick: () => { store.setMe(p); close(); } }, p)))));
+}
+
+let lastReadOnlyToast = 0;
+function readOnlyToast() {
+  if (Date.now() - lastReadOnlyToast < 1500) return;
+  lastReadOnlyToast = Date.now();
+  scheduleRender();
+  toast(`This is ${store.viewer()}’s planner — read-only.`, { action: 'Back to mine', onAction: () => store.view(null) });
+}
+
+/** "Alex | Kat" switch plus the overlay toggle. Hidden for a single person. */
+function peopleTools() {
+  const people = store.people();
+  if (people.length < 2) return null;
+  const others = people.filter(p => p !== store.viewer());
+  return h('span.people-tools',
+    h('span.people-switch', { role: 'group', 'aria-label': 'Whose planner' }, people.map(p => h('button.chip', {
+      type: 'button', class: p === store.viewer() ? 'on' : '', 'aria-pressed': String(p === store.viewer()),
+      style: { '--person': personColor(p) }, title: p === store.me() ? 'Your planner' : `${p}’s planner (read-only)`,
+      onclick: () => store.view(p),
+    }, p))),
+    h('button.chip.overlay-toggle', {
+      type: 'button', class: overlayOn() ? 'on' : '', 'aria-pressed': String(overlayOn()),
+      title: `Show ${others.join(' & ')}’s todos on these pages too (o)`, onclick: () => setOverlay(!overlayOn()),
+    }, `+ ${others.join(' & ')}`));
 }
 
 async function refresh() {
@@ -187,6 +227,7 @@ function renderHeader() {
         h('a', { href: '#/someday', class: route.view === 'someday' ? 'on' : '', dataset: { dropWhen: 'someday' } }, 'Someday')),
       h('div.tools',
         h('span#sync'),
+        peopleTools(),
         h('button.chip.zen-toggle', { type: 'button', class: document.documentElement.classList.contains('zen') ? 'on' : '', 'aria-pressed': String(document.documentElement.classList.contains('zen')), title: 'Zen mode: hide the busy bits (z)', onclick: () => setZen(!document.documentElement.classList.contains('zen')) }, 'Zen'),
         h('a.icon', { href: '#/settings', 'aria-label': 'Settings', title: 'Settings' }, '⚙'),
         isMock ? h('span.chip.mock-chip', { title: 'Sample data — changes stay in this browser' }, 'sample')
@@ -258,8 +299,12 @@ function render() {
   const y = window.scrollY;
   const focusedAdd = document.activeElement?.matches?.('input.add-line, input.meal-add') ? document.activeElement.getAttribute('aria-label') : null;
   main.className = `view-${route.view}`;
+  document.documentElement.classList.toggle('readonly', store.readOnly());
   try {
-    main.replaceChildren(fn ? fn(route.param, route.query) : h('div.page', h('h2', 'Not found'), h('a', { href: '#/' }, 'Back to this week')));
+    main.replaceChildren(store.readOnly() ? h('div.readonly-banner', { style: { '--person': personColor(store.viewer()) } },
+      h('span', h('strong', `${store.viewer()}’s planner`), ' — read-only. Meals and trips are shared and still editable.'),
+      h('button.chip', { type: 'button', onclick: () => store.view(null) }, 'Back to mine')) : '',
+    fn ? fn(route.param, route.query) : h('div.page', h('h2', 'Not found'), h('a', { href: '#/' }, 'Back to this week')));
   } catch (e) {
     console.error(e);
     main.replaceChildren(h('div.page', h('h2', 'Something went wrong'), h('pre.code', e.stack || e.message)));
@@ -281,6 +326,7 @@ function onKey(e) {
   const horizon = { d: 'day', w: 'week', m: 'month', q: 'quarter', y: 'year' }[e.key];
   if (e.key === 'n') { e.preventDefault(); openCapture(); }
   else if (e.key === 'e') { e.preventDefault(); openCapture({ mode: 'event' }); }
+  else if (e.key === 'o' && store.people().length > 1) { e.preventDefault(); setOverlay(!overlayOn()); }
   else if (e.key === 'z') { e.preventDefault(); setZen(!document.documentElement.classList.contains('zen')); }
   else if (e.key === 'ArrowLeft' && period) go(periodHash(P.prev(period)));
   else if (e.key === 'ArrowRight' && period) go(periodHash(P.next(period)));

@@ -3,7 +3,7 @@ import * as P from '../periods.js';
 import { store, tasksAt, carriedOver, today } from '../store.js';
 import { h, section, focusBlock, notesBlock } from './components.js';
 import { taskList, addLine, moveTask } from './task.js';
-import { dueSoonStrip, tripBanners, calRange, holidayLabels, dueMarkers, eventChip, addEventButton } from './shared.js';
+import { dueSoonStrip, tripBanners, calRange, holidayLabels, dueMarkers, eventChip, addEventButton, othersAt } from './shared.js';
 import * as cal from '../calendar.js';
 import { openCapture } from './event.js';
 import { habitsPanel } from './habits.js';
@@ -60,7 +60,8 @@ export function render(day) {
         section('Todos',
           h('div.drop-zone', { dataset: { dropWhen: day } },
             taskList(dayTasks, { hide: ['when'], emptyText: 'Nothing planned yet.' }),
-            addLine({ when: day }, { placeholder: 'Add a todo for this day…' }))),
+            addLine({ when: day }, { placeholder: 'Add a todo for this day…' }),
+            othersAt(day))),
         habitsPanel(day),
         dueMarkers(day) ? section('Due today', dueMarkers(day)) : null,
         carried.length ? section('Carried over', taskList(carried, {

@@ -223,6 +223,47 @@ await shot('interact-meals');
 await evaluate(`location.hash = '#/day'`); await sleep(500);
 if (!(await evaluate(`!!document.querySelector('.meals-today')`))) problems.push('[meals] no meals panel in the day view');
 
+// Two people: overlay the other's todos, view their planner read-only, shared meals still editable
+currentRoute = 'interact:people';
+await evaluate(`location.hash = '#/week'`); await sleep(500);
+const people = await evaluate(`(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btns = [...document.querySelectorAll('.people-switch button')].map(b => b.textContent);
+  if (btns.join() !== 'Sam,Jo') return 'switch shows ' + btns.join();
+  if (document.querySelector('.other-task')) return 'overlay on by default';
+  document.querySelector('.overlay-toggle').click(); await sleep(300);
+  if (!document.querySelector('.day-cell .other-task')) return 'overlay shows nothing';
+  [...document.querySelectorAll('.people-switch button')].find(b => b.textContent === 'Jo').click(); await sleep(300);
+  if (!document.querySelector('.readonly-banner')) return 'no read-only banner';
+  if (!document.querySelector('.day-cell .task')) return 'Jo has no tasks in her week';
+  if (document.querySelector('.day-cell .task .title')?.textContent.includes('VAT')) return 'Sam’s task shown as Jo’s';
+  if (getComputedStyle(document.querySelector('#fab')).display !== 'none') return 'capture button visible while read-only';
+  const box = document.querySelector('.day-cell .task:not(.done) input[type=checkbox]');
+  const label = box.getAttribute('aria-label');
+  box.click(); await sleep(300);
+  const again = [...document.querySelectorAll('.day-cell .task input[type=checkbox]')].find(i => i.getAttribute('aria-label') === label);
+  if (!again || again.checked) return 'ticked Jo’s task (' + label + ')';
+  if (!document.querySelector('.toast')) return 'no read-only toast';
+  return true;
+})()`);
+if (people !== true) problems.push('[people] ' + people);
+await shot('interact-people-jo');
+await evaluate(`location.hash = '#/meals'`); await sleep(500);
+const sharedMeal = await evaluate(`(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const count = () => document.querySelector('main').textContent.split('Soup').length;
+  const before = count();
+  const input = document.querySelector('input.meal-add');
+  if (!input || getComputedStyle(input).display === 'none') return 'meal input hidden in Jo’s view';
+  input.value = 'Soup'; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await sleep(300);
+  return count() > before || 'meal not added';
+})()`);
+if (sharedMeal !== true) problems.push('[people] meals while viewing Jo: ' + sharedMeal);
+await evaluate(`document.querySelector('.readonly-banner button').click()`); await sleep(300);
+if (await evaluate(`document.documentElement.classList.contains('readonly')`)) problems.push('[people] still read-only after Back to mine');
+await evaluate(`location.hash = '#/month'`); await sleep(600);
+await shot('interact-people-overlay-month');
+
 currentRoute = 'interact:review';
 await evaluate(`location.hash = '#/review/2026-W41'`); await sleep(400);
 for (let i = 0; i < 4; i++) { await evaluate(`[...document.querySelectorAll('.review-page .actions button.primary')].pop()?.click()`); await sleep(300); }

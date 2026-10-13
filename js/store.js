@@ -3,11 +3,14 @@
 //   loadAll()                          → { [tab]: record[] }
 //   append(tab, record)                → record
 //   update(tab, key, patch, baseAt, full) → record as now stored (merged with the remote row)
-import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
+import { TABS, TAB_NAMES, OWNED, newRecord, DEFAULT_SETTINGS } from './schema.js';
 import * as P from './periods.js';
 import { parseMealInput, copyWeekPlan, cleanTitle } from './meals.js';
 
 const QUEUE_KEY = 'planner-queue';
+const ME_KEY = 'planner-me';
+/** Settings that differ per person (stored as "Name|key"). */
+const PERSONAL_SETTINGS = new Set(['calendars', 'background_calendars']);
 const lsGet = k => { try { return globalThis.localStorage?.getItem(k) ?? null; } catch { return null; } };
 const lsSet = (k, v) => { try { v === null ? globalThis.localStorage?.removeItem(k) : globalThis.localStorage?.setItem(k, v); } catch { /* storage unavailable */ } };
 const nowIso = () => new Date().toISOString();
@@ -107,6 +110,7 @@ export const store = {
   status: 'idle', // idle | saving | saved | failed | offline | auth
   lastError: null,
   loaded: false,
+  viewing: null, // whose planner is shown; null = your own
 
   subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   emit(kind = 'data') { for (const fn of listeners) fn(kind); },
@@ -145,13 +149,42 @@ export const store = {
   },
 
   // ---- reads
-  get(tab, key) { const r = this.data[tab].get(key); return isLive(r) ? r : null; },
-  all(tab) { return [...this.data[tab].values()].filter(isLive); },
-  setting(key) { return this.data.Settings.get(key)?.value ?? DEFAULT_SETTINGS[key] ?? ''; },
-  period(p) { return this.data.Periods.get(p) || { period: p, focus_1: '', focus_2: '', focus_3: '', notes: '', review: '', reviewed_at: '' }; },
+  get(tab, key) { const r = this.data[tab].get(key); return isLive(r) && this._visible(tab, r, this.viewer()) ? r : null; },
+  all(tab) { return this.allOf(tab, this.viewer()); },
+  /** Live rows of `tab` belonging to `person` (shared tabs: everything). */
+  allOf(tab, person) { return [...this.data[tab].values()].filter(r => isLive(r) && this._visible(tab, r, person)); },
+  setting(key) {
+    const own = PERSONAL_SETTINGS.has(key) && this.people().length > 1 && this.me() !== this.people()[0] ? this.data.Settings.get(`${this.me()}|${key}`) : null;
+    return (own || this.data.Settings.get(key))?.value ?? DEFAULT_SETTINGS[key] ?? '';
+  },
+  period(p) { return this.data.Periods.get(this.periodKey(p)) || { period: p, focus_1: '', focus_2: '', focus_3: '', notes: '', review: '', reviewed_at: '' }; },
+
+  // ---- people (one shared sheet; personal rows carry an owner)
+  people() {
+    const v = String(this.data.Settings.get('people')?.value || '');
+    if (v !== this._peopleRaw) { this._peopleRaw = v; this._people = v.split(',').map(s => s.trim()).filter(Boolean); }
+    return this._people;
+  },
+  /** Who uses this device: remembered per device, else the first person. */
+  me() { const ps = this.people(); const m = lsGet(ME_KEY); return ps.includes(m) ? m : ps[0] || ''; },
+  setMe(name) { lsSet(ME_KEY, name); this.viewing = null; this.emit('data'); },
+  viewer() { return this.viewing || this.me(); },
+  view(person) { this.viewing = person && person !== this.me() ? person : null; this.emit('data'); },
+  readOnly() { return !!this.viewing && this.viewing !== this.me(); },
+  ownerOf(r) { return r.owner || this.people()[0] || ''; },
+  _visible(tab, r, person) { return !OWNED.has(tab) || this.people().length < 2 || this.ownerOf(r) === person; },
+  /** Periods rows: the first person's are keyed by the bare period, everyone else's as "Name|period". */
+  periodKey(p, person = this.viewer()) { return !person || person === this.people()[0] ? p : `${person}|${p}`; },
+  _blocked(tab) {
+    if (!OWNED.has(tab) || !this.readOnly()) return false;
+    this.emit('readonly');
+    return true;
+  },
 
   // ---- writes (optimistic)
   add(tab, fields) {
+    if (this._blocked(tab)) return null;
+    if (OWNED.has(tab) && !fields.owner && this.me()) fields = { ...fields, owner: this.me() };
     const rec = newRecord(tab, fields);
     if (tab === 'Tasks' && rec.done && !rec.done_at) rec.done_at = rec.updated_at;
     this.data[tab].set(rec[TABS[tab].key], rec);
@@ -161,6 +194,7 @@ export const store = {
   },
 
   update(tab, key, patch) {
+    if (this._blocked(tab)) return this.data[tab].get(key) || null;
     const cur = this.data[tab].get(key);
     if (!cur) {
       if (TABS[tab].key === 'id') throw new Error(`No ${tab} record ${key}`);
@@ -177,8 +211,11 @@ export const store = {
   },
 
   remove(tab, key) { return this.update(tab, key, { deleted: true }); },
-  setPeriod(p, patch) { return this.update('Periods', p, patch); },
-  setSetting(key, value) { return this.update('Settings', key, { value: String(value) }); },
+  setPeriod(p, patch) { return this.update('Periods', this.periodKey(p), patch); },
+  setSetting(key, value) {
+    const k = PERSONAL_SETTINGS.has(key) && this.people().length > 1 && this.me() !== this.people()[0] ? `${this.me()}|${key}` : key;
+    return this.update('Settings', k, { value: String(value) });
+  },
 
   _applyLocal(tab, key, patch) {
     const cur = this.data[tab].get(key);

@@ -4,7 +4,7 @@ import { store, tasksAt, dueState, remindDefault, tripColor, today } from '../st
 import * as cal from '../calendar.js';
 import { h, section, focusBlock, notesBlock, go } from './components.js';
 import { taskList, addLine } from './task.js';
-import { calRange, goalsInPlay, reviewLink, printTools, eventChip } from './shared.js';
+import { calRange, goalsInPlay, reviewLink, printTools, eventChip, othersAt } from './shared.js';
 
 /** Assign each trip overlapping [start,end] a lane so overlapping trips stack. */
 export function tripLanes(trips, start, end) {
@@ -58,6 +58,7 @@ export function render(month) {
       evs.slice(0, 3).map(e => eventChip(e, { cls: 'mini-event', label: [e.allDay ? '' : e.startTime + ' ', e.title] })),
       evs.length > 3 ? h('div.more', `+${evs.length - 3} more`) : null,
       dayTodos.length ? taskList(dayTodos, { compact: true }) : null,
+      othersAt(day, { compact: true }),
       due.map(t => h('div.mini-due', { class: dueState(t, td, rd) || '', title: `Due: ${t.title}` }, '⚑ ', t.title)));
   };
 
@@ -78,6 +79,7 @@ export function render(month) {
         goalsInPlay([month], 'Month goals'),
         section('This month, no date yet', h('div.drop-zone', { dataset: { dropWhen: month } },
           taskList(tasksAt(month, { includeDone: false }), { hide: ['when'] }),
-          addLine({ when: month }, { placeholder: 'Add to this month…' }))),
+          addLine({ when: month }, { placeholder: 'Add to this month…' }),
+          othersAt(month))),
         notesBlock(month))));
 }

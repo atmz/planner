@@ -3,7 +3,7 @@ import * as P from '../periods.js';
 import { tasksAt, carriedOver, today } from '../store.js';
 import { h, section, focusBlock, notesBlock } from './components.js';
 import { taskList, addLine, moveTask } from './task.js';
-import { dueSoonStrip, calRange, eventList, holidayLabels, dueMarkers, tripBanners, goalsInPlay, reviewLink, addEventButton } from './shared.js';
+import { dueSoonStrip, calRange, eventList, holidayLabels, dueMarkers, tripBanners, goalsInPlay, reviewLink, addEventButton, othersAt } from './shared.js';
 import * as cal from '../calendar.js';
 import { habitWeekGrid } from './habits.js';
 
@@ -25,6 +25,7 @@ export function render(week) {
     tripBanners(day),
     eventList(events, day, { compact: true }),
     taskList(tasksAt(day), { hide: ['when'] }),
+    othersAt(day),
     dueMarkers(day),
     addLine({ when: day }, { placeholder: `Add to ${P.DOW3[P.dow(day)]}…` }));
 
@@ -32,7 +33,8 @@ export function render(week) {
     reviewLink(week),
     section('This week, no day yet', h('div.drop-zone', { dataset: { dropWhen: week } },
       taskList(tasksAt(week, { includeDone: false }), { hide: ['when'], actions: t => dayPicker(t, days) }),
-      addLine({ when: week }, { placeholder: 'Add to this week…' }))),
+      addLine({ when: week }, { placeholder: 'Add to this week…' }),
+      othersAt(week))),
     section('From this month', h('div.drop-zone', { dataset: { dropWhen: month } },
       taskList(tasksAt(month, { includeDone: false }), {
         hide: ['when'],

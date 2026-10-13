@@ -5,30 +5,33 @@ const AUDIT = ['created_at', 'updated_at', 'deleted'];
 
 export const TABS = {
   Areas: { key: 'id', columns: ['id', 'name', 'color', 'order', 'archived', ...AUDIT] },
-  Goals: { key: 'id', columns: ['id', 'title', 'when', 'area_id', 'parent_id', 'why', 'measure', 'status', 'progress', 'order', 'notes', ...AUDIT] },
-  Projects: { key: 'id', columns: ['id', 'title', 'area_id', 'goal_id', 'status', 'target', 'notes', 'order', 'created_at', 'updated_at', 'done_at', 'deleted'] },
+  Goals: { key: 'id', columns: ['id', 'title', 'when', 'area_id', 'parent_id', 'why', 'measure', 'status', 'progress', 'order', 'notes', 'owner', ...AUDIT] },
+  Projects: { key: 'id', columns: ['id', 'title', 'area_id', 'goal_id', 'status', 'target', 'notes', 'order', 'owner', 'created_at', 'updated_at', 'done_at', 'deleted'] },
   Tasks: {
     key: 'id',
     columns: ['id', 'title', 'when', 'time', 'due', 'due_time', 'remind_days', 'due_event_id', 'priority', 'done',
-      'area_id', 'project_id', 'goal_id', 'trip_id', 'list_id', 'notes', 'order', 'event_id',
+      'area_id', 'project_id', 'goal_id', 'trip_id', 'list_id', 'notes', 'order', 'event_id', 'owner',
       'created_at', 'updated_at', 'done_at', 'deleted'],
   },
-  Periods: { key: 'period', columns: ['period', 'focus_1', 'focus_2', 'focus_3', 'notes', 'review', 'reviewed_at', 'updated_at'] },
+  Periods: { key: 'period', columns: ['period', 'focus_1', 'focus_2', 'focus_3', 'notes', 'review', 'reviewed_at', 'owner', 'updated_at'] },
   Trips: { key: 'id', columns: ['id', 'title', 'destination', 'start', 'end', 'status', 'who', 'area_id', 'color', 'event_id', 'notes', ...AUDIT] },
   TripItems: {
     key: 'id',
     columns: ['id', 'trip_id', 'kind', 'title', 'date', 'time', 'end_date', 'end_time', 'location', 'reference', 'link',
       'cost', 'currency', 'notes', 'order', ...AUDIT],
   },
-  Lists: { key: 'id', columns: ['id', 'title', 'area_id', 'trip_id', 'notes', 'order', ...AUDIT] },
+  Lists: { key: 'id', columns: ['id', 'title', 'area_id', 'trip_id', 'notes', 'order', 'owner', ...AUDIT] },
   Settings: { key: 'key', columns: ['key', 'value', 'updated_at'] },
-  Habits: { key: 'id', columns: ['id', 'title', 'kind', 'schedule', 'days', 'target', 'area_id', 'color', 'start', 'order', 'archived', 'notes', ...AUDIT] },
-  HabitLog: { key: 'key', columns: ['key', 'habit_id', 'day', 'done', 'note', 'updated_at'] },
+  Habits: { key: 'id', columns: ['id', 'title', 'kind', 'schedule', 'days', 'target', 'area_id', 'color', 'start', 'order', 'archived', 'notes', 'owner', ...AUDIT] },
+  HabitLog: { key: 'key', columns: ['key', 'habit_id', 'day', 'done', 'note', 'owner', 'updated_at'] },
   Meals: { key: 'id', columns: ['id', 'day', 'slot', 'who', 'title', 'url', 'recipe_id', 'notes', 'eaten', 'order', ...AUDIT] },
   Recipes: { key: 'id', columns: ['id', 'title', 'url', 'who', 'tags', 'notes', ...AUDIT] },
 };
 
 export const TAB_NAMES = Object.keys(TABS);
+
+/** Tabs whose rows belong to one person (an `owner` column; blank = the first person). The rest are shared. */
+export const OWNED = new Set(TAB_NAMES.filter(t => TABS[t].columns.includes('owner')));
 
 const BOOL = new Set(['done', 'deleted', 'archived', 'eaten']);
 const NUM = new Set(['order', 'progress', 'remind_days', 'cost', 'target']);

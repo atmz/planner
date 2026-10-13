@@ -93,3 +93,28 @@ export function printTools(title) {
 }
 
 export { areaOf };
+
+// ---- other people's plans, laid over your own (read-only)
+
+const OVERLAY_KEY = 'planner-overlay';
+const PERSON_COLORS = ['#3d6b9e', '#a2456b', '#4c8a5a', '#b0703a'];
+export function personColor(name) { return PERSON_COLORS[Math.max(0, store.people().indexOf(name)) % PERSON_COLORS.length]; }
+export function overlayOn() { try { return localStorage.getItem(OVERLAY_KEY) === '1'; } catch { return false; } }
+export function setOverlay(on) {
+  try { on ? localStorage.setItem(OVERLAY_KEY, '1') : localStorage.removeItem(OVERLAY_KEY); } catch { /* ignore */ }
+  store.emit('data');
+}
+/** The people whose plans are laid over the page: everyone else, when the overlay is on. */
+export function overlayPeople() {
+  return overlayOn() ? store.people().filter(p => p !== store.viewer()) : [];
+}
+
+/** Other people's todos scheduled at exactly `period`, as quiet read-only lines in their colour. */
+export function othersAt(period, { compact = false } = {}) {
+  const rows = overlayPeople().flatMap(person => store.allOf('Tasks', person)
+    .filter(t => t.when === period && !t.list_id)
+    .sort((a, b) => (a.time || '99').localeCompare(b.time || '99') || (a.order ?? 0) - (b.order ?? 0))
+    .map(t => h('li.other-task', { class: t.done ? 'done' : '', style: { '--person': personColor(person) }, title: `${person}: ${t.title}${t.done ? ' (done)' : ''}` },
+      h('span.who-dot', person[0]), t.time && !compact ? h('span.ev-time', t.time + ' ') : null, t.title)));
+  return rows.length ? h('ul.others', { class: compact ? 'compact' : '' }, rows) : null;
+}

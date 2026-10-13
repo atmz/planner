@@ -757,3 +757,21 @@ input.meal-add:focus { outline: none; border-bottom-color: var(--accent); }
   .goal-node details > ul { display: block; }
   .year-bottom a.small { display: none; }
 }
+
+/* ---- people: whose planner, overlay of the others' todos, read-only mode ---- */
+.people-tools { display: inline-flex; gap: .35rem; align-items: center; }
+.people-switch { display: inline-flex; border: 1px solid var(--edge); border-radius: 999px; padding: 1px; gap: 1px; }
+.people-switch .chip { border: 0; background: none; }
+.people-switch .chip.on { background: color-mix(in srgb, var(--person) 18%, var(--paper)); color: var(--ink); box-shadow: inset 0 -2px 0 var(--person); }
+ul.others { list-style: none; margin: .15rem 0 0; padding: 0; display: grid; gap: .1rem; }
+li.other-task { font-size: .8rem; color: var(--ink-soft); display: flex; gap: .3rem; align-items: baseline; padding-left: .3rem; border-left: 2px solid var(--person); min-width: 0; overflow-wrap: anywhere; }
+li.other-task.done { text-decoration: line-through; color: var(--ink-faint); }
+.who-dot { flex: none; width: 1.05rem; height: 1.05rem; border-radius: 50%; display: inline-grid; place-items: center; font-size: .62rem; font-weight: 700; background: var(--person); color: var(--paper); align-self: center; }
+ul.others.compact li.other-task { font-size: .68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+ul.others.compact .who-dot { width: .8rem; height: .8rem; font-size: .5rem; margin-right: .2rem; vertical-align: middle; display: inline-grid; }
+.readonly-banner { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; margin: 0 auto .75rem; max-width: 1400px; padding: .5rem .9rem; border-radius: 8px; background: color-mix(in srgb, var(--person) 14%, var(--paper)); border: 1px solid color-mix(in srgb, var(--person) 40%, transparent); }
+/* Someone else's planner: hide the ways to add, except on shared pages. */
+.readonly #fab { display: none; }
+.readonly #main:not(.view-meals):not(.view-trips):not(.view-trip) :is(input.add-line, .habit-add, .add-event) { display: none; }
+.zen .overlay-toggle:not(.on) { display: none; }
+@media print { .people-tools, .readonly-banner { display: none; } }

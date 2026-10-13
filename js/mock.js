@@ -3,7 +3,7 @@
 import * as P from './periods.js';
 import { TABS, TAB_NAMES, newRecord, DEFAULT_SETTINGS } from './schema.js';
 
-const KEY = 'planner-mock-v4';
+const KEY = 'planner-mock-v5';
 const EV_KEY = 'planner-mock-events-v3';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* ignore */ } };
@@ -139,14 +139,27 @@ function generate(T = P.today()) {
   }
   add('Meals', { day: d(1), slot: 'lunch', who: 'all', title: 'Leftover bolognese', eaten: false });
 
+  // The other person's plans (read-only for Sam; shown with "+ Jo")
+  const jo = f => add('Tasks', { ...f, owner: 'Jo' });
+  jo({ title: 'Dentist', when: T, time: '09:30', area_id: personal.id });
+  jo({ title: 'Swim lessons drop-off', when: d(1), time: '16:00', area_id: family.id });
+  jo({ title: 'Conference prep', when: d(2), area_id: work.id });
+  jo({ title: 'Away — conference', when: d(3), area_id: work.id });
+  jo({ title: 'Return library books', when: d(-1), area_id: home.id, done: true });
+  jo({ title: 'Renew passport', when: week, area_id: family.id, due: d(6) });
+  jo({ title: 'Plan Mum’s 70th', when: month, area_id: family.id });
+  add('Goals', { title: 'Swim 1 km without stopping', when: quarter, area_id: personal.id, status: 'active', owner: 'Jo' });
+  add('Habits', { title: 'Yoga', kind: 'do', schedule: 'weekly', target: 3, start: d(-20), owner: 'Jo' });
+
   // Period pages
   db.Periods.push(
+    { period: `Jo|${week}`, owner: 'Jo', focus_1: 'Conference talk ready', focus_2: 'Passport form in', focus_3: '', notes: '', review: '', reviewed_at: '', updated_at: new Date().toISOString() },
     { period: week, focus_1: 'VAT return out of the door', focus_2: 'Book the tiler', focus_3: 'Three runs', notes: 'Jo away Thu–Fri.', review: '', reviewed_at: '', updated_at: new Date().toISOString() },
     { period: month, focus_1: 'Kitchen decisions made', focus_2: 'Website wireframes', focus_3: 'Plan Christmas trip', notes: '', review: '', reviewed_at: '', updated_at: new Date().toISOString() },
     { period: quarter, focus_1: 'Kitchen usable', focus_2: 'New client signed', focus_3: '', notes: '', review: '', reviewed_at: '', updated_at: new Date().toISOString() },
     { period: year, focus_1: 'Health', focus_2: 'House', focus_3: 'Steady work', notes: 'Word of the year: enough.', review: '', reviewed_at: '', updated_at: new Date().toISOString() },
   );
-  const settings = { ...DEFAULT_SETTINGS, calendars: 'primary,family', background_calendars: 'holidays,school' };
+  const settings = { ...DEFAULT_SETTINGS, calendars: 'primary,family', background_calendars: 'holidays,school', people: 'Sam, Jo' };
   for (const [key, value] of Object.entries(settings)) db.Settings.push({ key, value, updated_at: new Date().toISOString() });
   return db;
 }

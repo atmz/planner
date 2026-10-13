@@ -46,6 +46,20 @@ function areaEditor() {
     input);
 }
 
+function peopleEditor() {
+  const people = store.people();
+  return h('div',
+    h('p.muted.small', 'Everyone shares one sheet. Your todos, goals, projects, lists, habits and reviews are yours; the others can see them but not change them. Meals, recipes, trips and areas are shared. Rows from before people were added belong to the first name.'),
+    h('div.field-row',
+      h('label.field', h('span', 'People (first name first, comma-separated)'),
+        inlineInput(people.join(', '), v => {
+          const names = v.split(',').map(x => x.trim()).filter(Boolean);
+          if (people.length && names[0] !== people[0]) return toast('Keep the first name first — existing rows belong to them.');
+          store.setSetting('people', names.join(', '));
+        }, { placeholder: 'e.g. Sam, Jo', 'aria-label': 'People' })),
+      people.length > 1 ? h('label.field', h('span', 'This device is'), selectEl(people.map(p => [p, p]), store.me(), v => store.setMe(v))) : null));
+}
+
 export function render() {
   const isMock = document.documentElement.classList.contains('mock');
   return h('div.page.settings-page',
@@ -57,9 +71,10 @@ export function render() {
           h('label.field', h('span', 'Weekly review day'), selectEl([['mon', 'Monday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']], store.setting('review_day'), v => store.setSetting('review_day', v))),
           h('label.field', h('span', 'Default “due soon” warning (days)'), h('input', { type: 'number', min: 0, max: 60, value: store.setting('default_remind_days'), onchange: e => store.setSetting('default_remind_days', e.target.value || '3') })),
           h('label.field', h('span', 'Week starts'), h('span.muted', 'Monday (ISO weeks)')))),
+      section('People', peopleEditor()),
       section('Areas', areaEditor()),
       isMock ? section('Sample data', h('p.muted.small', 'You’re using sample data stored in this browser only.'),
         h('button.danger', { type: 'button', onclick: () => confirmAction('Reset all sample data to its starting state?', () => { resetMock(); location.reload(); }, 'Reset') }, 'Reset sample data')) : null,
-      section('Keyboard', h('p.small', h('kbd', 'n'), ' capture · ', h('kbd', '←'), h('kbd', '→'), ' previous/next · ', h('kbd', 't'), ' today · ', h('kbd', 'd w m q y'), ' horizon · ', h('kbd', 'g'), ' goals · ', h('kbd', 'p'), ' projects · ', h('kbd', 'i'), ' inbox'))));
+      section('Keyboard', h('p.small', h('kbd', 'n'), ' capture · ', h('kbd', '←'), h('kbd', '→'), ' previous/next · ', h('kbd', 't'), ' today · ', h('kbd', 'd w m q y'), ' horizon · ', h('kbd', 'g'), ' goals · ', h('kbd', 'p'), ' projects · ', h('kbd', 'i'), ' inbox · ', h('kbd', 'z'), ' zen · ', h('kbd', 'o'), ' show the others’ todos'))));
 }
 
